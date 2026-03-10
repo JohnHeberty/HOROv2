@@ -240,20 +240,18 @@ def _render_frame(
     frame_idx: int,
     frames_folder: str,
     config: PipelineConfig,
-    show_best: bool = False,
 ) -> None:
     """Renderiza um único frame e salva como JPEG."""
     rc  = config.render
     img = base_image.copy()
 
-    # ---- Retângulo da MELHOR pista (verde) — só após a rotação terminar ----
-    if show_best:
-        _draw_runway_rect(img, center, crosswind_r, comprimento,
-                          best_heading, rc.color_best_runway, 2)
-        draw_reference_point(img, center, comprimento, best_heading,
-                             (0, 210, 0), rc.point_ref_size)
-        draw_reference_point(img, center, comprimento, best_heading + 180,
-                             (0, 210, 0), rc.point_ref_size)
+    # ---- Retângulo da MELHOR pista (verde) — na melhor posição encontrada até agora ----
+    _draw_runway_rect(img, center, crosswind_r, comprimento,
+                      best_heading, rc.color_best_runway, 2)
+    draw_reference_point(img, center, comprimento, best_heading,
+                         (0, 210, 0), rc.point_ref_size)
+    draw_reference_point(img, center, comprimento, best_heading + 180,
+                         (0, 210, 0), rc.point_ref_size)
 
     # ---- Retângulo da pista ATUAL (branco, mais grosso) ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
@@ -286,21 +284,20 @@ def _render_frame(
         cv.putText(img, line, (rx, ry0 + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
 
-    # ---- Painel ESQUERDO — melhor pista (verde) — só nos frames finais ----
+    # ---- Painel ESQUERDO — melhor pista (verde) — sempre visível ----
     lx  = rc.legend_x_left
     ly0 = lspace * 2
-    if show_best:
-        left_lines = [
-            "BEST DIRECTION",
-            f"FO: {best_fo:.2f}%",
-            f"RUMO: {int(best_heading):03d}",
-            f"MAGNETIC DECLINATION: {declination:.1f}",
-            f"RUNWAY ORIENTATION: {headboard_runway(best_heading)}",
-            f"CROSS WIND: {cross_best:.2f}%",
-        ]
-        for i, line in enumerate(left_lines):
-            cv.putText(img, line, (lx, ly0 + i * lspace),
-                       font, fsize, (0, 255, 0), fthick, cv.LINE_AA)
+    left_lines = [
+        "BEST DIRECTION",
+        f"FO: {best_fo:.2f}%",
+        f"RUMO: {int(best_heading):03d}",
+        f"MAGNETIC DECLINATION: {declination:.1f}",
+        f"RUNWAY ORIENTATION: {headboard_runway(best_heading)}",
+        f"CROSS WIND: {cross_best:.2f}%",
+    ]
+    for i, line in enumerate(left_lines):
+        cv.putText(img, line, (lx, ly0 + i * lspace),
+                   font, fsize, (0, 255, 0), fthick, cv.LINE_AA)
 
     # ---- Info do aeroporto (base) ----
     lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
@@ -422,18 +419,26 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 base_image, comprimento, crosswind_r, rose_center = \
                     _build_base_image(df_slice, config)
 
-                # ---- Gera frames 0–179°: só pista branca rotacionando, sem verde ----
+                # ---- Gera frames 0–179°: verde atualiza quando encontra novo máximo ----
+                best_h_so_far:  float = 0.0
+                best_fo_so_far: float = 0.0
+
                 for frame_idx in range(config.render.max_spin_deg):
                     heading = float(frame_idx)
                     fo_now  = fo_map.get(heading, fo_map.get(int(heading), 0.0))
+
+                    # Atualiza melhor posição sempre que FO supera o máximo anterior
+                    if fo_now > best_fo_so_far:
+                        best_fo_so_far = fo_now
+                        best_h_so_far  = heading
 
                     _render_frame(
                         base_image=base_image,
                         comprimento=comprimento,
                         crosswind_r=crosswind_r,
                         center=rose_center,
-                        best_heading=best_heading_final,
-                        best_fo=fo_best,
+                        best_heading=best_h_so_far,
+                        best_fo=best_fo_so_far,
                         heading_deg=heading,
                         fo_pct=fo_now,
                         station_name=station,
@@ -444,10 +449,9 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         frame_idx=frame_idx,
                         frames_folder=frames_folder,
                         config=config,
-                        show_best=False,   # verde oculto durante rotação
                     )
                 
-                # ---- Gera frames finais FIXOS na melhor posição: verde aparece ----
+                # ---- Gera frames finais FIXOS na melhor posição ----
                 n_final_frames = 30
                 for i in range(n_final_frames):
                     _render_frame(
@@ -467,7 +471,6 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         frame_idx=config.render.max_spin_deg + i,
                         frames_folder=frames_folder,
                         config=config,
-                        show_best=True,    # verde aparece nos frames finais
                     )
 
                 log.info(
