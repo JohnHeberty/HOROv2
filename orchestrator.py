@@ -16,6 +16,8 @@ Desenvolvido por John Heberty de Freitas — john.7heberty@gmail.com
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import sys
 
 from pipeline.core.config import cfg
@@ -37,6 +39,27 @@ from pipeline.stages import (
 )
 
 log = get_logger("orchestrator")
+
+
+def clean_cache_layers() -> None:
+    """
+    Limpa as camadas de cache (bronze, silver, gold) mas mantém raw intacta.
+    Chamado automaticamente antes de executar o pipeline.
+    """
+    layers_to_clean = [
+        cfg.output.data_bronze,
+        cfg.output.data_silver,
+        cfg.output.data_gold,
+    ]
+    
+    for layer_path in layers_to_clean:
+        if os.path.exists(layer_path):
+            try:
+                shutil.rmtree(layer_path)
+                log.info("Cache limpo", layer=os.path.basename(layer_path))
+            except Exception as e:
+                log.warning("Erro ao limpar cache", layer=layer_path, error=str(e))
+
 
 # Mapa de estágios na ordem correta de execução
 STAGE_MAP = {
@@ -103,6 +126,10 @@ def run_pipeline(
     Returns:
         PipelineContext preenchido ao final da execução.
     """
+    # Limpa cache de todas as camadas (exceto raw) antes de executar
+    if not dry_run:
+        clean_cache_layers()
+    
     # Stage 0: mescla múltiplos CSVs da mesma estação ANTES de ler os arquivos
     if not dry_run:
         s00_merge_raw.run(config=cfg)

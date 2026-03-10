@@ -416,21 +416,21 @@ def _render_frame(
     cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f} deg", (rx, decl_y),
                font, fsize, (255, 200, 100), fthick, cv.LINE_AA)
     
-    # ---- Rosa dos ventos matplotlib (lado DIREITO, centralizada) ----
+    # ---- Rosa dos ventos NOAA (lado DIREITO, alinhada) ----
     if windrose_img is not None:
         try:
-            # Redimensiona windrose para caber no espaço disponível
+            # Redimensiona windrose (20% menor que antes)
             wr_height, wr_width = windrose_img.shape[:2]
-            target_width = 450  # Largura desejada
+            target_width = 360  # Reduzido de 450 para 360 (20% menor)
             scale = target_width / wr_width
             target_height = int(wr_height * scale)
             
             windrose_resized = cv.resize(windrose_img, (target_width, target_height), 
                                         interpolation=cv.INTER_LANCZOS4)
             
-            # Posiciona abaixo da declinação, centralizada horizontalmente no lado direito
+            # Posiciona abaixo da declinação, alinhada à direita com as informações de cima
             wr_y_start = decl_y + int(lspace * 2)
-            wr_x_start = rx - 50  # Pequeno ajuste para centralizar melhor
+            wr_x_start = rx  # Alinhado com as informações de cima
             
             # Certifica que não ultrapassa os limites
             if wr_y_start + target_height < rc.image_height:
@@ -572,32 +572,9 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                             log.warning("Falha ao decodificar windrose NOAA", station=station, 
                                        years=years, path=noaa_path)
                     else:
-                        # Fallback: gera windrose matplotlib se NOAA não disponível
-                        log.info("Imagem NOAA não encontrada, gerando windrose matplotlib", 
-                                station=station, paths=[noaa_windrose_path, noaa_screenshot_path])
-                        
-                        year_dir = os.path.join(
-                            config.output.data_gold, "exports", station, f"{years}y"
-                        )
-                        os.makedirs(year_dir, exist_ok=True)
-                        
-                        windrose_path = _windrose_plotter.plot_from_config(
-                            df=df_slice,
-                            station=station,
-                            years=years,
-                            output_dir=year_dir,
-                            declination=declination,
-                        )
-                        
-                        windrose_path = os.path.abspath(os.path.normpath(windrose_path))
-                        
-                        if os.path.exists(windrose_path):
-                            file_bytes = np.fromfile(windrose_path, dtype=np.uint8)
-                            windrose_img = cv.imdecode(file_bytes, cv.IMREAD_COLOR)
-                            
-                            if windrose_img is not None:
-                                log.info("Windrose matplotlib carregada (fallback)", 
-                                        station=station, years=years, shape=windrose_img.shape)
+                        # Sem fallback: se NOAA não disponível, não mostra imagem
+                        log.warning("Imagem NOAA não encontrada, vídeo será gerado sem rosa dos ventos", 
+                                   station=station, paths=[noaa_windrose_path, noaa_screenshot_path])
                 except Exception as exc:
                     log.warning("Erro ao carregar windrose (não crítico)", 
                                station=station, years=years, error=str(exc))
