@@ -259,17 +259,26 @@ def _render_frame(
     draw_reference_point(img, center, comprimento, _best_dot_h,
                          (0, 210, 0), rc.point_ref_size)
 
-    # ---- Numeração de pista (verde) próxima à bolinha ----
+    # ---- Numeração de pista (verde): cabeceira em cada extremo ----
     cx, cy = center
-    rwy_text = headboard_runway(best_heading).replace("-", "/")
-    rwy_label = f"RWY {rwy_text}"
-    _rad_rwy = np.radians(-_best_dot_h - 180)
+    _head_a, _head_b = headboard_runway(best_heading).split("-")  # ex: "11", "29"
+    # _head_a corresponde ao ângulo best_heading; _head_b ao oposto
+    _near_best = (abs(_best_dot_h - best_heading % 360) % 360) < 90
+    _dot_label = _head_a if _near_best else _head_b   # cabeceira no lado da bolinha
+    _far_label = _head_b if _near_best else _head_a   # cabeceira no lado oposto
+    _far_dot_h = (_best_dot_h + 180.0) % 360.0
+
+    _fsize_rwy = rc.font_size * 0.85
+    _fthick_rwy = rc.font_thickness + 1
     _offs = comprimento + 55
-    _tx = int(cx + _offs * np.sin(_rad_rwy))
-    _ty = int(cy + _offs * np.cos(_rad_rwy))
-    (_tw, _th), _ = cv.getTextSize(rwy_label, rc.font, rc.font_size * 0.85, rc.font_thickness)
-    cv.putText(img, rwy_label, (_tx - _tw // 2, _ty + _th // 2),
-               rc.font, rc.font_size * 0.85, rc.color_best_runway, rc.font_thickness + 1, cv.LINE_AA)
+
+    for _lbl, _ang in ((_dot_label, _best_dot_h), (_far_label, _far_dot_h)):
+        _rad = np.radians(-_ang - 180)
+        _lx = int(cx + _offs * np.sin(_rad))
+        _ly = int(cy + _offs * np.cos(_rad))
+        (_lw, _lh), _ = cv.getTextSize(_lbl, rc.font, _fsize_rwy, _fthick_rwy)
+        cv.putText(img, _lbl, (_lx - _lw // 2, _ly + _lh // 2),
+                   rc.font, _fsize_rwy, rc.color_best_runway, _fthick_rwy, cv.LINE_AA)
 
     # ---- Retângulo da pista ATUAL (branco, mais grosso) ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
