@@ -176,20 +176,14 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
         )
 
     # ------------------------------------------------------------------
-    # Override: declina\u00e7\u00e3o magnética direta — pula NOAA completamente
+    # Override: declinação magnética direta — MAS ainda faz consulta NOAA para gerar imagem
     # ------------------------------------------------------------------
-    if config.wind.magnetic_declination_override is not None:
-        dec = config.wind.magnetic_declination_override
+    override_declination = config.wind.magnetic_declination_override
+    if override_declination is not None:
         log.info(
-            "Declinação magnética sobrescrita pelo config_runway.json — consulta NOAA ignorada",
-            declination=dec,
+            "Declinação magnética sobrescrita pelo config_runway.json — mas consultando NOAA para gerar imagem da rosa dos ventos",
+            declination=override_declination,
         )
-        for station, record in context.silver.items():
-            record.magnetic_declination = dec
-            log.info("Declinação aplicada (override)", station=station, declination=dec)
-        context.stages_executed.append("s05_enrich")
-        log.info("Stage 5 finalizado")
-        return context
 
     cache_path = os.path.join(config.output.data_silver, DECLINATIONS_CACHE_FILE)
     cache = _load_cache(cache_path)
@@ -209,12 +203,23 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 updated = True
 
     # Verifica quantas estações precisam de consulta real à NOAA
+    # Força consulta para gerar imagem se override está ativo e imagem não existe
+    noaa_image_path = os.path.join(config.output.data_silver, "noaa_after_calc.png")
+    force_fetch_for_image = (
+        override_declination is not None 
+        and not os.path.exists(noaa_image_path)
+    )
+    
     need_fetch = [
         (station, record)
         for station, record in context.silver.items()
-        if station not in cache
+        if ((station not in cache) or force_fetch_for_image)
         and not (record.metadata.latitude == 0.0 and record.metadata.longitude == 0.0)
     ]
+    
+    if force_fetch_for_image and need_fetch:
+        log.info("Forçando consulta NOAA para gerar imagem da rosa dos ventos", 
+                override_declination=override_declination)
 
     if not need_fetch:
         log.info("Todas as declinações já estão em cache")
@@ -240,14 +245,22 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
     if updated:
         _save_cache(cache_path, cache)
 
-    # Aplica ao contexto Silver
+    # Aplica ao contexto Silver (usa override se definido, senão usa cache)
     for station, record in context.silver.items():
-        record.magnetic_declination = cache.get(station, 0.0)
-        log.info(
-            "Declinação aplicada",
-            station=station,
-            declination=record.magnetic_declination,
-        )
+        if override_declination is not None:
+            record.magnetic_declination = override_declination
+            log.info(
+                "Declinação aplicada (override)",
+                station=station,
+                declination=record.magnetic_declination,
+            )
+        else:
+            record.magnetic_declination = cache.get(station, 0.0)
+            log.info(
+                "Declinação aplicada",
+                station=station,
+                declination=record.magnetic_declination,
+            )
 
     context.stages_executed.append("s05_enrich")
     log.info("Stage 5 finalizado")

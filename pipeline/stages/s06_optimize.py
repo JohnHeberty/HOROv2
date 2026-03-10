@@ -411,10 +411,9 @@ def _render_frame(
                    font, fsize, (210, 210, 210), fthick, cv.LINE_AA)
     
     # ---- Declinação magnética (lado DIREITO, abaixo da info) ----
-    # Usa chr(176) para símbolo de grau (evita problemas de encoding)
+    # Usa " deg" (ASCII) pois fontes OpenCV HERSHEY não suportam símbolo de grau
     decl_y = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
-    decl_symbol = chr(176)  # °
-    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f}{decl_symbol}", (rx, decl_y),
+    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f} deg", (rx, decl_y),
                font, fsize, (255, 200, 100), fthick, cv.LINE_AA)
     
     # ---- Rosa dos ventos matplotlib (lado DIREITO, centralizada) ----
@@ -551,43 +550,52 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 base_image, comprimento, crosswind_r, rose_center = \
                     _build_base_image(df_slice, config)
 
-                # ---- Gera rosa dos ventos matplotlib para embedding nos frames ----
+                # ---- Carrega imagem da rosa dos ventos do NOAA (declinação magnética) ----
                 windrose_img = None
                 try:
-                    # Gera windrose PNG na pasta da janela temporal (5y/, 10y/, etc)
-                    year_dir = os.path.join(
-                        config.output.data_gold, "exports", station, f"{years}y"
-                    )
-                    os.makedirs(year_dir, exist_ok=True)
+                    # Primeiro tenta carregar a imagem do NOAA (gerada no Stage 5)
+                    noaa_path = os.path.join(config.output.data_silver, "noaa_after_calc.png")
                     
-                    windrose_path = _windrose_plotter.plot_from_config(
-                        df=df_slice,
-                        station=station,
-                        years=years,
-                        output_dir=year_dir,
-                        declination=declination,
-                    )
-                    
-                    # Normaliza caminho para evitar problemas com '..' e acentos
-                    windrose_path = os.path.abspath(os.path.normpath(windrose_path))
-                    
-                    # Carrega windrose com np.fromfile para suportar caminhos Unicode
-                    if os.path.exists(windrose_path):
-                        # Técnica para bypass do bug do OpenCV com caracteres não-ASCII
-                        file_bytes = np.fromfile(windrose_path, dtype=np.uint8)
+                    if os.path.exists(noaa_path):
+                        # Carrega imagem do NOAA com np.fromfile para suportar caminhos Unicode
+                        file_bytes = np.fromfile(noaa_path, dtype=np.uint8)
                         windrose_img = cv.imdecode(file_bytes, cv.IMREAD_COLOR)
                         
                         if windrose_img is not None:
-                            log.info("Windrose matplotlib carregada", station=station, 
+                            log.info("Windrose NOAA carregada", station=station, 
                                     years=years, shape=windrose_img.shape)
                         else:
-                            log.warning("Falha ao decodificar windrose PNG", station=station, 
-                                       years=years, path=windrose_path)
+                            log.warning("Falha ao decodificar windrose NOAA", station=station, 
+                                       years=years, path=noaa_path)
                     else:
-                        log.warning("Windrose PNG não encontrada", station=station,
-                                   years=years, path=windrose_path)
+                        # Fallback: gera windrose matplotlib se NOAA não disponível
+                        log.info("Imagem NOAA não encontrada, gerando windrose matplotlib", 
+                                station=station, path=noaa_path)
+                        
+                        year_dir = os.path.join(
+                            config.output.data_gold, "exports", station, f"{years}y"
+                        )
+                        os.makedirs(year_dir, exist_ok=True)
+                        
+                        windrose_path = _windrose_plotter.plot_from_config(
+                            df=df_slice,
+                            station=station,
+                            years=years,
+                            output_dir=year_dir,
+                            declination=declination,
+                        )
+                        
+                        windrose_path = os.path.abspath(os.path.normpath(windrose_path))
+                        
+                        if os.path.exists(windrose_path):
+                            file_bytes = np.fromfile(windrose_path, dtype=np.uint8)
+                            windrose_img = cv.imdecode(file_bytes, cv.IMREAD_COLOR)
+                            
+                            if windrose_img is not None:
+                                log.info("Windrose matplotlib carregada (fallback)", 
+                                        station=station, years=years, shape=windrose_img.shape)
                 except Exception as exc:
-                    log.warning("Erro ao gerar windrose matplotlib (não crítico)", 
+                    log.warning("Erro ao carregar windrose (não crítico)", 
                                station=station, years=years, error=str(exc))
 
                 # ---- Gera frames 0–179°: verde atualiza quando encontra novo máximo ----
