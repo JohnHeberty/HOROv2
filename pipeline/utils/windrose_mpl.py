@@ -213,31 +213,11 @@ class WindRosePlotter:
         ax.set_rticks(r_ticks)
         ax.set_yticklabels(r_labels)
 
-        # Círculo do limite de crosswind (linha vermelha tracejada)
-        crosswind_r = r_max * (self.crosswind_limit / max_band_kt)
-        theta = np.linspace(0, 2 * np.pi, 360)
-        ax.plot(
-            theta,
-            [crosswind_r] * 360,
-            color="red",
-            linewidth=1.5,
-            linestyle="--",
-            alpha=0.7,
-        )
-        legend_patches.append(
-            mpatches.Patch(
-                facecolor="none",
-                edgecolor="red",
-                linestyle="--",
-                label=f"Crosswind limit: {self.crosswind_limit:.0f} kt (RBAC154)",
-            )
-        )
-
         # Linhas de grade radiais — desativa o auto e usa só as customizadas
         ax.set_rlabel_position(22.5)
-        ax.tick_params(axis="y", labelsize=8, labelcolor="gray")
-        ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, color="gray")
-        ax.xaxis.grid(True, linestyle="-", linewidth=0.4, alpha=0.4, color="gray")
+        ax.tick_params(axis="y", labelsize=13, labelcolor="black", pad=4)
+        ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.6, color="black")
+        ax.xaxis.grid(True, linestyle="-", linewidth=0.4, alpha=0.5, color="black")
 
         # Labels cardeais
         ax.set_xticks(np.radians([0, 45, 90, 135, 180, 225, 270, 315]))
