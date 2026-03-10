@@ -176,6 +176,22 @@ def _build_base_image(
 
 
 # ---------------------------------------------------------------------------
+# Utilitário: extremidade canônica (lado norte) de uma pista
+# ---------------------------------------------------------------------------
+def _canonical_end(h: float) -> float:
+    """
+    Retorna o extremo da pista (h ou h+180) que está mais próximo do Norte.
+    Garante que a bolinha verde sempre apareça no mesmo lado (hemisfério norte)
+    independentemente de qual direção o ângulo 'h' aponta.
+    """
+    h_n   = h % 360.0
+    recip = (h_n + 180.0) % 360.0
+    dist_h = min(h_n, 360.0 - h_n)   # distância angular até 0° (Norte)
+    dist_r = min(recip, 360.0 - recip)
+    return h_n if dist_h <= dist_r else recip
+
+
+# ---------------------------------------------------------------------------
 # Utilitário: retângulo de pista rotacionado
 # ---------------------------------------------------------------------------
 def _draw_runway_rect(
@@ -238,15 +254,16 @@ def _render_frame(
     # ---- Retângulo da MELHOR pista (verde) — na melhor posição encontrada até agora ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       best_heading, rc.color_best_runway, 2)
-    # Bolinha num único extremo da pista verde (em best_heading — extremo "ativo" da orientação)
-    draw_reference_point(img, center, comprimento, best_heading,
+    # Bolinha no extremo norte-canônico da pista verde (lado mais próximo do Norte)
+    _best_dot_h = _canonical_end(best_heading)
+    draw_reference_point(img, center, comprimento, _best_dot_h,
                          (0, 210, 0), rc.point_ref_size)
 
     # ---- Numeração de pista (verde) próxima à bolinha ----
     cx, cy = center
     rwy_text = headboard_runway(best_heading).replace("-", "/")
     rwy_label = f"RWY {rwy_text}"
-    _rad_rwy = np.radians(-best_heading - 180)
+    _rad_rwy = np.radians(-_best_dot_h - 180)
     _offs = comprimento + 55
     _tx = int(cx + _offs * np.sin(_rad_rwy))
     _ty = int(cy + _offs * np.cos(_rad_rwy))
@@ -257,9 +274,8 @@ def _render_frame(
     # ---- Retângulo da pista ATUAL (branco, mais grosso) ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       heading_deg, rc.color_runway, 3)
-    # Bolinha num único extremo da pista branca — em heading_deg, percorre 360° sem resetar
-    draw_reference_point(img, center, comprimento, heading_deg,
-                         rc.color_point_ref, rc.point_ref_size)
+    # Sem bolinha na pista branca — o retângulo já indica a direção e evita
+    # confusão quando heading_deg ≈ best_heading + 180° (dois extremos opostos)
 
     # ---- Parâmetros de texto ----
     font   = rc.font
