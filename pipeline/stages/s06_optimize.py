@@ -571,14 +571,17 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     # Normaliza caminho para evitar problemas com '..' e acentos
                     windrose_path = os.path.abspath(os.path.normpath(windrose_path))
                     
-                    # Carrega windrose como array numpy
+                    # Carrega windrose com np.fromfile para suportar caminhos Unicode
                     if os.path.exists(windrose_path):
-                        windrose_img = cv.imread(windrose_path)
+                        # Técnica para bypass do bug do OpenCV com caracteres não-ASCII
+                        file_bytes = np.fromfile(windrose_path, dtype=np.uint8)
+                        windrose_img = cv.imdecode(file_bytes, cv.IMREAD_COLOR)
+                        
                         if windrose_img is not None:
                             log.info("Windrose matplotlib carregada", station=station, 
                                     years=years, shape=windrose_img.shape)
                         else:
-                            log.warning("Falha ao carregar windrose PNG", station=station, 
+                            log.warning("Falha ao decodificar windrose PNG", station=station, 
                                        years=years, path=windrose_path)
                     else:
                         log.warning("Windrose PNG não encontrada", station=station,
