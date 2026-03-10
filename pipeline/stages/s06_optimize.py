@@ -553,8 +553,12 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 # ---- Carrega imagem da rosa dos ventos do NOAA (declinação magnética) ----
                 windrose_img = None
                 try:
-                    # Primeiro tenta carregar a imagem do NOAA (gerada no Stage 5)
-                    noaa_path = os.path.join(config.output.data_silver, "noaa_after_calc.png")
+                    # Primeiro tenta carregar a rosa dos ventos extraída do mapa NOAA
+                    noaa_windrose_path = os.path.join(config.output.data_silver, "noaa_windrose.png")
+                    noaa_screenshot_path = os.path.join(config.output.data_silver, "noaa_after_calc.png")
+                    
+                    # Prioriza a rosa dos ventos extraída
+                    noaa_path = noaa_windrose_path if os.path.exists(noaa_windrose_path) else noaa_screenshot_path
                     
                     if os.path.exists(noaa_path):
                         # Carrega imagem do NOAA com np.fromfile para suportar caminhos Unicode
@@ -563,14 +567,14 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         
                         if windrose_img is not None:
                             log.info("Windrose NOAA carregada", station=station, 
-                                    years=years, shape=windrose_img.shape)
+                                    years=years, shape=windrose_img.shape, source=noaa_path)
                         else:
                             log.warning("Falha ao decodificar windrose NOAA", station=station, 
                                        years=years, path=noaa_path)
                     else:
                         # Fallback: gera windrose matplotlib se NOAA não disponível
                         log.info("Imagem NOAA não encontrada, gerando windrose matplotlib", 
-                                station=station, path=noaa_path)
+                                station=station, paths=[noaa_windrose_path, noaa_screenshot_path])
                         
                         year_dir = os.path.join(
                             config.output.data_gold, "exports", station, f"{years}y"

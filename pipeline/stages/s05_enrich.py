@@ -51,11 +51,11 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
+    import base64
 
-    from pipeline.utils.geo import latlon_to_grau_minuto, dms_string_to_decimal
+    from pipeline.utils.geo import dms_string_to_decimal
 
     Declination = ""
-    lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
 
     def wait_click(css):
         try:
@@ -69,25 +69,31 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
 
     wait_click("#declinationIGRF")
 
-    # Latitude
+    # Latitude (formato decimal, ex: -23.428375)
     el = wait_click("#declinationLat1")
     if el:
         el.clear()
-        el.send_keys(lat_dms)
+        el.send_keys(str(abs(lat)))  # Envia valor absoluto
         time.sleep(1)
+        # Seleciona hemisfério N/S
+        lat_dir = 'S' if lat < 0 else 'N'
         try:
             driver.find_element(By.CSS_SELECTOR, f"[value='{lat_dir}']").click()
         except Exception:
             pass
 
-    # Longitude
+    # Longitude (formato decimal, ex: -46.467887)
     el = wait_click("#declinationLon1")
     if el:
         el.clear()
-        el.send_keys(lon_dms)
+        el.send_keys(str(abs(lon)))  # Envia valor absoluto
         time.sleep(1)
+        # Seleciona hemisfério E/W
+        lon_dir = 'W' if lon < 0 else 'E'
         try:
             driver.find_element(By.CSS_SELECTOR, f"[value='{lon_dir}']").click()
+        except Exception:
+            pass
         except Exception:
             pass
 
@@ -103,12 +109,85 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
     wait_click("#calcbutton")
     time.sleep(8)  # Espera mais longa para o cálculo completar no servidor NOAA
     
-    # DEBUG: salva screenshot depois do cálculo
+    # Extrai a imagem da rosa dos ventos (mapa com seta de declinação)
     try:
-        driver.save_screenshot("data/silver/noaa_after_calc.png")
-        log.debug("Screenshot salvo", path="data/silver/noaa_after_calc.png")
-    except Exception:
-        pass
+        # Aguarda o mapa carregar
+        time.sleep(3)
+        
+        # Pega a imagem do mapa Leaflet (rosa dos ventos com seta)
+        # O NOAA usa Leaflet.js para renderizar o mapa
+        script = """
+        // Busca o canvas do mapa Leaflet
+        const mapPane = document.querySelector('.leaflet-map-pane');
+        if (mapPane) {
+            // Pega as dimensões do container do mapa
+            const mapContainer = document.querySelector('.leaflet-container');
+            const rect = mapContainer.getBoundingClientRect();
+            
+            // Cria canvas temporário
+            const canvas = document.createElement('canvas');
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            const ctx = canvas.getContext('2d');
+            
+            // Copia tiles do mapa para canvas
+            const tiles = mapContainer.querySelectorAll('img');
+            tiles.forEach(tile => {
+                if (tile.complete && tile.getBoundingClientRect) {
+                    const tileRect = tile.getBoundingClientRect();
+                    ctx.drawImage(tile, 
+                        tileRect.left - rect.left, 
+                        tileRect.top - rect.top,
+                        tileRect.width,
+                        tileRect.height
+                    );
+                }
+            });
+            
+            // Copia vetores (seta da rosa) por cima
+            const svgs = mapContainer.querySelectorAll('svg');
+            svgs.forEach(svg => {
+                const svgRect = svg.getBoundingClientRect();
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const img = new Image();
+                img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+                ctx.drawImage(img, 
+                    svgRect.left - rect.left,
+                    svgRect.top - rect.top,
+                    svgRect.width,
+                    svgRect.height
+                );
+            });
+            
+            return canvas.toDataURL('image/png');
+        }
+        return null;
+        """
+        
+        # Executa script e pega imagem base64
+        windrose_data = driver.execute_script(script)
+        
+        if windrose_data and windrose_data.startswith('data:image/png;base64,'):
+            # Remove prefixo e decodifica
+            img_data = windrose_data.split(',')[1]
+            img_bytes = base64.b64decode(img_data)
+            
+            # Salva imagem da rosa dos ventos
+            windrose_path = "data/silver/noaa_windrose.png"
+            with open(windrose_path, 'wb') as f:
+                f.write(img_bytes)
+            log.info("Rosa dos ventos NOAA extraída", path=windrose_path)
+        else:
+            # Fallback: screenshot normal se extração falhar
+            driver.save_screenshot("data/silver/noaa_after_calc.png")
+            log.warning("Falha ao extrair rosa dos ventos - usando screenshot", 
+                       path="data/silver/noaa_after_calc.png")
+    except Exception as e:
+        log.warning("Erro ao extrair imagem da rosa dos ventos", error=str(e))
+        try:
+            driver.save_screenshot("data/silver/noaa_after_calc.png")
+        except Exception:
+            pass
 
     try:
         data_find = datetime.now().strftime("%Y-%m-%d")
