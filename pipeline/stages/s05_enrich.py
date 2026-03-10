@@ -51,7 +51,6 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
     from selenium.webdriver.common.by import By
     from selenium.webdriver.support import expected_conditions as EC
     from selenium.webdriver.support.ui import WebDriverWait
-    import base64
 
     from pipeline.utils.geo import dms_string_to_decimal
 
@@ -114,80 +113,23 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
         # Aguarda o mapa carregar
         time.sleep(3)
         
-        # Pega a imagem do mapa Leaflet (rosa dos ventos com seta)
-        # O NOAA usa Leaflet.js para renderizar o mapa
-        script = """
-        // Busca o canvas do mapa Leaflet
-        const mapPane = document.querySelector('.leaflet-map-pane');
-        if (mapPane) {
-            // Pega as dimensões do container do mapa
-            const mapContainer = document.querySelector('.leaflet-container');
-            const rect = mapContainer.getBoundingClientRect();
-            
-            // Cria canvas temporário
-            const canvas = document.createElement('canvas');
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            const ctx = canvas.getContext('2d');
-            
-            // Copia tiles do mapa para canvas
-            const tiles = mapContainer.querySelectorAll('img');
-            tiles.forEach(tile => {
-                if (tile.complete && tile.getBoundingClientRect) {
-                    const tileRect = tile.getBoundingClientRect();
-                    ctx.drawImage(tile, 
-                        tileRect.left - rect.left, 
-                        tileRect.top - rect.top,
-                        tileRect.width,
-                        tileRect.height
-                    );
-                }
-            });
-            
-            // Copia vetores (seta da rosa) por cima
-            const svgs = mapContainer.querySelectorAll('svg');
-            svgs.forEach(svg => {
-                const svgRect = svg.getBoundingClientRect();
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const img = new Image();
-                img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
-                ctx.drawImage(img, 
-                    svgRect.left - rect.left,
-                    svgRect.top - rect.top,
-                    svgRect.width,
-                    svgRect.height
-                );
-            });
-            
-            return canvas.toDataURL('image/png');
-        }
-        return null;
-        """
-        
-        # Executa script e pega imagem base64
-        windrose_data = driver.execute_script(script)
-        
-        if windrose_data and windrose_data.startswith('data:image/png;base64,'):
-            # Remove prefixo e decodifica
-            img_data = windrose_data.split(',')[1]
-            img_bytes = base64.b64decode(img_data)
-            
-            # Salva imagem da rosa dos ventos
-            windrose_path = "data/silver/noaa_windrose.png"
-            with open(windrose_path, 'wb') as f:
-                f.write(img_bytes)
-            log.info("Rosa dos ventos NOAA extraída", path=windrose_path)
-        else:
-            # Fallback: screenshot normal se extração falhar
-            driver.save_screenshot("data/silver/noaa_after_calc.png")
-            log.warning("Falha ao extrair rosa dos ventos - usando screenshot", 
-                       path="data/silver/noaa_after_calc.png")
-    except Exception as e:
-        log.warning("Erro ao extrair imagem da rosa dos ventos", error=str(e))
+        # Busca o elemento do mapa Leaflet
         try:
+            map_element = driver.find_element(By.CSS_SELECTOR, '.leaflet-container')
+            
+            # Faz screenshot apenas do elemento do mapa
+            windrose_path = "data/silver/noaa_windrose.png"
+            map_element.screenshot(windrose_path)
+            log.info("Rosa dos ventos NOAA extraída", path=windrose_path)
+            
+        except Exception as e:
+            # Fallback: screenshot da página inteira
+            log.warning("Falha ao extrair elemento do mapa, usando screenshot completo", error=str(e))
             driver.save_screenshot("data/silver/noaa_after_calc.png")
-        except Exception:
-            pass
+            log.info("Screenshot NOAA salvo (fallback)", path="data/silver/noaa_after_calc.png")
+            
+    except Exception as e:
+        log.warning("Erro ao salvar imagem NOAA", error=str(e))
 
     try:
         data_find = datetime.now().strftime("%Y-%m-%d")
@@ -216,9 +158,26 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
     if not Declination.strip():
         raise MagneticDeclinationError(lat, lon)
 
-    direction  = Declination[-1:].strip()
-    dms_str    = Declination[:-1].strip()
-    angle      = dms_string_to_decimal(dms_str, direction)
+    # Parse do resultado (pode vir em formato decimal ou DMS)
+    direction  = Declination[-1:].strip()  # W ou E
+    value_str  = Declination[:-1].strip()  # Remove direção
+    
+    # Remove símbolo de grau se presente
+    value_str = value_str.replace('°', '').strip()
+    
+    # Detecta se é decimal (contém ponto) ou DMS (contém espaços/aspas)
+    if '.' in value_str and "'" not in value_str and '"' not in value_str:
+        # Formato decimal ex: "21.95"
+        angle = float(value_str)
+    else:
+        # Formato DMS ex: "21 57 00" ou "21° 57' 00\""
+        angle = dms_string_to_decimal(value_str, direction)
+    
+    # Aplica sinal baseado na direção (W e S são negativos)
+    if direction in ('W', 'S'):
+        angle = -abs(angle)
+    else:
+        angle = abs(angle)
 
     time.sleep(5)
     return angle
