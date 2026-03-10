@@ -554,25 +554,34 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 # ---- Gera rosa dos ventos matplotlib para embedding nos frames ----
                 windrose_img = None
                 try:
-                    # Gera windrose PNG temporária
-                    temp_dir = os.path.join(frames_folder, "..")
-                    os.makedirs(temp_dir, exist_ok=True)
+                    # Gera windrose PNG na pasta da janela temporal (5y/, 10y/, etc)
+                    year_dir = os.path.join(
+                        config.output.data_gold, "exports", station, f"{years}y"
+                    )
+                    os.makedirs(year_dir, exist_ok=True)
                     
                     windrose_path = _windrose_plotter.plot_from_config(
                         df=df_slice,
                         station=station,
                         years=years,
-                        output_dir=temp_dir,
+                        output_dir=year_dir,
                         declination=declination,
                     )
                     
+                    # Normaliza caminho para evitar problemas com '..' e acentos
+                    windrose_path = os.path.abspath(os.path.normpath(windrose_path))
+                    
                     # Carrega windrose como array numpy
-                    windrose_img = cv.imread(windrose_path)
-                    if windrose_img is not None:
-                        log.info("Windrose matplotlib carregada", station=station, 
-                                years=years, shape=windrose_img.shape)
+                    if os.path.exists(windrose_path):
+                        windrose_img = cv.imread(windrose_path)
+                        if windrose_img is not None:
+                            log.info("Windrose matplotlib carregada", station=station, 
+                                    years=years, shape=windrose_img.shape)
+                        else:
+                            log.warning("Falha ao carregar windrose PNG", station=station, 
+                                       years=years, path=windrose_path)
                     else:
-                        log.warning("Falha ao carregar windrose PNG", station=station, 
+                        log.warning("Windrose PNG não encontrada", station=station,
                                    years=years, path=windrose_path)
                 except Exception as exc:
                     log.warning("Erro ao gerar windrose matplotlib (não crítico)", 
