@@ -67,10 +67,13 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
 
     for station, by_years in context.results.items():
         for years, result in by_years.items():
-            frames_folder = config.output.folder_images.format(station)
+            # Busca pasta de frames específica da janela temporal
+            frames_folder = os.path.join(
+                config.output.data_gold, "exports", station, f"{years}y", "frames"
+            )
 
             if not os.path.isdir(frames_folder):
-                log.warning("Pasta de frames não encontrada", station=station, years=years)
+                log.warning("Pasta de frames não encontrada", station=station, years=years, path=frames_folder)
                 continue
 
             station_dir = os.path.join(exports_root, station)

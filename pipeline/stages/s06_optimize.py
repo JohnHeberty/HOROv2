@@ -48,7 +48,7 @@ from pipeline.utils.geo import latlon_to_grau_minuto
 
 log = get_logger("s06_optimize")
 
-YEAR_WINDOWS = [5, 10, 15, 20]
+# Janelas temporais serão calculadas dinamicamente baseado nos dados disponíveis
 
 # ---------------------------------------------------------------------------
 # Paleta de cores BGR por banda de velocidade
@@ -328,9 +328,27 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
         lon         = silver.metadata.longitude
         context.results[station] = {}
 
-        log.info("Otimizando", station=station, declination=declination)
+        # Calcula janelas temporais baseado nos dados disponíveis
+        if df_all.empty:
+            log.warning("DataFrame vazio", station=station)
+            continue
+        
+        max_date = df_all["timestamp"].max()
+        min_date = df_all["timestamp"].min()
+        anos_disponiveis = (max_date - min_date).days / 365.25
+        
+        # Define janelas possíveis (somente as que temos dados)
+        possible_windows = [5, 10, 15, 20]
+        year_windows = [y for y in possible_windows if y <= anos_disponiveis]
+        
+        # Se temos menos de 1 ano, usa todos os dados disponíveis como janela única
+        if not year_windows:
+            year_windows = [int(anos_disponiveis) if anos_disponiveis >= 1 else 1]
+        
+        log.info("Otimizando", station=station, declination=declination, 
+                 anos_disponiveis=f"{anos_disponiveis:.1f}", janelas=year_windows)
 
-        for years in YEAR_WINDOWS:
+        for years in year_windows:
             from dateutil.relativedelta import relativedelta  # type: ignore
 
             max_date = df_all["timestamp"].max()
@@ -385,7 +403,10 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 )
 
                 # ---- Constrói imagem base UMA VEZ por estação × janela ----
-                frames_folder = config.output.folder_images.format(station)
+                # Cria pasta separada para cada janela temporal
+                frames_folder = os.path.join(
+                    config.output.data_gold, "exports", station, f"{years}y", "frames"
+                )
                 os.makedirs(frames_folder, exist_ok=True)
 
                 base_image, comprimento, crosswind_r, rose_center = \
@@ -421,12 +442,35 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         frames_folder=frames_folder,
                         config=config,
                     )
+                
+                # ---- Gera frames finais FIXOS na melhor posição ----
+                # Adiciona 30 frames parados na melhor orientação (3 segundos @ 10fps)
+                n_final_frames = 30
+                for i in range(n_final_frames):
+                    _render_frame(
+                        base_image=base_image,
+                        comprimento=comprimento,
+                        crosswind_r=crosswind_r,
+                        center=rose_center,
+                        best_heading=best_heading_final,
+                        best_fo=fo_best,
+                        heading_deg=best_heading_final,
+                        fo_pct=fo_best,
+                        station_name=station,
+                        lat=lat,
+                        lon=lon,
+                        declination=declination,
+                        years=years,
+                        frame_idx=config.render.max_spin_deg + i,
+                        frames_folder=frames_folder,
+                        config=config,
+                    )
 
                 log.info(
                     "Frames gerados",
                     station=station,
                     years=years,
-                    n_frames=config.render.max_spin_deg,
+                    n_frames=config.render.max_spin_deg + n_final_frames,
                 )
 
             except Exception as exc:
