@@ -105,7 +105,12 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     )
                     gif_path = os.path.splitext(video_path)[0] + ".gif"
 
-                    if os.path.isdir(gif_frames_folder):
+                    # Verifica se gif_frames tem frames suficientes para 360°
+                    from glob import glob as _glob
+                    _gif_jpg_count = len(_glob(os.path.join(gif_frames_folder, "*.jpg")))
+                    _min_gif_frames = config.render.max_spin_deg * 2  # 360
+
+                    if os.path.isdir(gif_frames_folder) and _gif_jpg_count >= _min_gif_frames:
                         # Constrói vídeo temporário a partir dos frames 360° e converte para GIF
                         _gif_tmp_video = os.path.splitext(video_path)[0] + "_gif_tmp.mp4"
                         create_video(
@@ -125,14 +130,20 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                             os.remove(_gif_tmp_video)
                         except OSError:
                             pass
+                        log.info("GIF 360° gerado", station=station, years=years,
+                                 frames=_gif_jpg_count, path=gif_path)
                     else:
                         # Fallback: usa vídeo principal (180°)
+                        if _gif_jpg_count > 0:
+                            log.warning("GIF frames incompletos, usando vídeo como fallback",
+                                        station=station, years=years,
+                                        frames_found=_gif_jpg_count, frames_needed=_min_gif_frames)
                         create_gif(
                             video_path=video_path,
                             output_gif=gif_path,
                             speed_multiplier=rc.gif_speed_multiplier,
                         )
-                    log.info("GIF gerado", station=station, years=years, path=gif_path)
+                        log.info("GIF gerado (fallback 180°)", station=station, years=years, path=gif_path)
                 except Exception as exc:
                     log.warning("Falha ao gerar GIF (não crítico)", station=station, error=str(exc))
 

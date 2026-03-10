@@ -1,19 +1,70 @@
 {
+
+  "_section_runway": "============================================================",
+  "_section_runway_label": " PISTA — comprimento e limites RBAC154",
+  "_section_runway_end": "============================================================",
+
   "runway_length_m": 1199,
-  "description": "Comprimento de pista de referência em metros (RBAC154). O limite de vento cruzado é calculado automaticamente:",
-  "crosswind_limits_rbac154": {
-    ">=1500m": "20 kt (37 km/h)",
-    "1200-1500m": "13 kt (24 km/h)",
-    "<1200m": "10 kt (19 km/h)"
+  "_runway_length_note": "Comprimento de pista em metros. Define automaticamente o limite de vento cruzado (RBAC154):",
+  "_crosswind_limits_rbac154": {
+    ">=1500m": "20 kt  (37 km/h)",
+    "1200-1500m": "13 kt  (24 km/h)",
+    "<1200m": "10 kt  (19 km/h)"
   },
+
+
+  "_section_wind": "============================================================",
+  "_section_wind_label": " BANDAS DE VELOCIDADE DO VENTO",
+  "_section_wind_end": "============================================================",
+
   "wind_speed_bands_kts": [3, 13, 20, 25, 40],
-  "band_description": "Limites das bandas de velocidade do vento em nós. Cria bandas: [0-3], [3-13], [13-20], [20-25], [25-40], [40+]",
-  "note": "Altere 'runway_length_m' para mudar automaticamente o limite de crosswind conforme RBAC154.",
+  "_wind_speed_bands_note": "Limites das bandas em nos. Gera faixas: [0-3] [3-13] [13-20] [20-25] [25-40] [40+]",
 
-  "_coord_note": "Opcional. Se informados, substituem as coordenadas lidas do CSV para consulta NOAA e cálculo de declinação magnética.",
-  "latitude": null,
-  "longitude": null,
 
-  "_declination_note": "Opcional. Se informado (graus, positivo=Leste, negativo=Oeste), a consulta à NOAA é ignorada e este valor é usado diretamente.",
-  "magnetic_declination": null
+  "_section_coords": "============================================================",
+  "_section_coords_label": " COORDENADAS GEOGRAFICAS (opcional)",
+  "_section_coords_end": "============================================================",
+
+  "_coords_note": "Se informados, substituem as coordenadas lidas do cabecalho do CSV (para consulta NOAA e informacoes do video). Use null para desativar.",
+  "latitude": -23.428375,
+  "longitude": -46.467887,
+
+
+  "_section_declination": "============================================================",
+  "_section_declination_label": " DECLINACAO MAGNETICA (opcional)",
+  "_section_declination_end": "============================================================",
+
+  "_declination_note": "Se informado (graus; positivo=Leste, negativo=Oeste), a consulta a NOAA e ignorada. Use null para calcular automaticamente.",
+  "magnetic_declination": null,
+
+
+  "_section_video_colors": "============================================================",
+  "_section_video_colors_label": " CORES DO VIDEO — paleta por banda de velocidade",
+  "_section_video_colors_end": "============================================================",
+
+  "_video_colors_note": "Formato [R, G, B] 0-255. Uma cor por banda (mesma ordem das bandas acima). Banda 0=[0-3kt calmas], 1=[3-13], 2=[13-20], 3=[20-25], 4=[25-40], 5=[40+].",
+  "video_band_colors_rgb": [
+    [180, 180, 180],
+    [ 30, 100, 255],
+    [ 40, 255,  40],
+    [255, 255,   0],
+    [255, 150,   0],
+    [255,  30,   0]
+  ],
+
+
+  "_section_windrose_colors": "============================================================",
+  "_section_windrose_colors_label": " CORES DA ROSA DOS VENTOS (PNG) — paleta por banda de velocidade",
+  "_section_windrose_colors_end": "============================================================",
+
+  "_windrose_colors_note": "Formato [R, G, B] 0-255. Separado do video para permitir paletas distintas. Mesma ordem das bandas acima.",
+  "windrose_band_colors_rgb": [
+    [180, 180, 180],
+    [ 30, 100, 255],
+    [ 40, 255,  40],
+    [255, 255,   0],
+    [255, 150,   0],
+    [255,  30,   0]
+  ]
+
 }

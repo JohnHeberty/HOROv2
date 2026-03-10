@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from glob import glob
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import cv2 as cv
 
@@ -98,6 +98,17 @@ class WindRoseConfig:
              "S",   "SSE", "SE",  "ESE", "E",   "ENE", "NE",  "NNE"],
     })
 
+    # Paleta de cores da rosa PNG — carregada de config_runway.json
+    # Formato interno: normalized RGB float (matplotlib). Índices 0–5 = bandas de velocidade.
+    windrose_band_colors_rgb: List[Tuple[float, float, float]] = field(default_factory=lambda: [
+        (0.706, 0.706, 0.706),  # [0-3]   cinza claro
+        (0.118, 0.392, 1.000),  # [3-13]  azul forte
+        (0.157, 1.000, 0.157),  # [13-20] verde vibrante
+        (1.000, 1.000, 0.000),  # [20-25] amarelo brilhante
+        (1.000, 0.588, 0.000),  # [25-40] laranja forte
+        (1.000, 0.118, 0.000),  # [40+]   vermelho intenso
+    ])
+
 
 # ---------------------------------------------------------------------------
 # Configurações de renderização visual
@@ -125,6 +136,17 @@ class RenderConfig:
     legend_x_left: int = 40
     legend_y_spacing: int = 40
     max_spin_deg: int = 180
+
+    # Paleta de cores do vídeo (BGR, OpenCV) — carregada de config_runway.json
+    # Índices 0–5 = bandas de velocidade.
+    video_band_colors_bgr: List[Tuple[int, int, int]] = field(default_factory=lambda: [
+        (180, 180, 180),  # [0-3]   cinza claro
+        (255, 100,  30),  # [3-13]  azul forte  (BGR: B=255)
+        ( 40, 255,  40),  # [13-20] verde vibrante
+        (  0, 255, 255),  # [20-25] amarelo brilhante
+        (  0, 150, 255),  # [25-40] laranja forte
+        (  0,  30, 255),  # [40+]   vermelho intenso
+    ])
 
     def __post_init__(self) -> None:
         self.legend_x_right = self.image_width - 510
@@ -244,6 +266,22 @@ class PipelineConfig:
                     # Override de declinação magnética — pula NOAA quando definido
                     if data.get("magnetic_declination") is not None:
                         self.wind.magnetic_declination_override = float(data["magnetic_declination"])
+
+                    # Cores do vídeo: JSON armazena [R,G,B] 0-255 → converte para BGR (OpenCV)
+                    if "video_band_colors_rgb" in data:
+                        raw = data["video_band_colors_rgb"]
+                        if isinstance(raw, list) and len(raw) >= 6:
+                            self.render.video_band_colors_bgr = [
+                                (int(c[2]), int(c[1]), int(c[0])) for c in raw
+                            ]
+
+                    # Cores da rosa PNG: JSON armazena [R,G,B] 0-255 → converte para float 0-1 (matplotlib)
+                    if "windrose_band_colors_rgb" in data:
+                        raw = data["windrose_band_colors_rgb"]
+                        if isinstance(raw, list) and len(raw) >= 6:
+                            self.wind.windrose_band_colors_rgb = [
+                                (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in raw
+                            ]
             except Exception:
                 pass  # Se falhar, mantém o valor padrão
 

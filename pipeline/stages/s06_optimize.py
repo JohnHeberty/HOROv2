@@ -50,18 +50,7 @@ log = get_logger("s06_optimize")
 
 # Janelas temporais serão calculadas dinamicamente baseado nos dados disponíveis
 
-# ---------------------------------------------------------------------------
-# Paleta de cores BGR por banda de velocidade (cores vibrantes para degradê)
-# Índices: 0=[0-3] 1=[3-13] 2=[13-20] 3=[20-25] 4=[25-40] 5=[40+]
-# ---------------------------------------------------------------------------
-_BAND_COLORS_BGR: List[Tuple[int, int, int]] = [
-    (180, 180, 180),   # [0-3]   calmas  — cinza claro
-    (255, 100,  30),   # [3-13]  — azul forte
-    ( 40, 255,  40),   # [13-20] — verde vibrante
-    (  0, 255, 255),   # [20-25] — amarelo brilhante
-    (  0, 150, 255),   # [25-40] — laranja forte
-    (  0,  30, 255),   # [40+]   — vermelho intenso
-]
+# Cores carregadas de config_runway.json via config.render.video_band_colors_bgr
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +113,8 @@ def _build_base_image(
         col_name = col_titles[b_idx]
         r_outer  = int(W * limits[b_idx]                  * proporcao)
         r_inner  = int(W * limits[b_idx - 1]              * proporcao) if b_idx > 0 else 0
-        base_bgr = _BAND_COLORS_BGR[min(b_idx, len(_BAND_COLORS_BGR) - 1)]
+        palette  = config.render.video_band_colors_bgr
+        base_bgr = palette[min(b_idx, len(palette) - 1)]
         r_mask   = (R >= r_inner) & (R < r_outer)
 
         for s_name, (s_start, s_end) in setores.items():
@@ -245,20 +235,37 @@ def _render_frame(
     rc  = config.render
     img = base_image.copy()
 
+    # ---- Helper: retorna o ângulo do extremo que aponta para o Norte (parte superior da tela) ----
+    def _north_h(h: float) -> float:
+        """De um par de cabeceiras, retorna a que fica no semi-plano norte (y < cy)."""
+        h_n = h % 360.0
+        return h_n if (h_n <= 90.0 or h_n >= 270.0) else (h_n + 180.0) % 360.0
+
     # ---- Retângulo da MELHOR pista (verde) — na melhor posição encontrada até agora ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       best_heading, rc.color_best_runway, 2)
-    draw_reference_point(img, center, comprimento, best_heading,
+    # Bolinha apenas no extremo norte da pista verde
+    best_north_h = _north_h(best_heading)
+    draw_reference_point(img, center, comprimento, best_north_h,
                          (0, 210, 0), rc.point_ref_size)
-    draw_reference_point(img, center, comprimento, best_heading + 180,
-                         (0, 210, 0), rc.point_ref_size)
+
+    # ---- Numeração de pista (verde) próxima à bolinha norte ----
+    cx, cy = center
+    rwy_text = headboard_runway(best_heading).replace("-", "/")
+    rwy_label = f"RWY {rwy_text}"
+    _rad_rwy = np.radians(-best_north_h - 180)
+    _offs = comprimento + 55
+    _tx = int(cx + _offs * np.sin(_rad_rwy))
+    _ty = int(cy + _offs * np.cos(_rad_rwy))
+    (_tw, _th), _ = cv.getTextSize(rwy_label, rc.font, rc.font_size * 0.85, rc.font_thickness)
+    cv.putText(img, rwy_label, (_tx - _tw // 2, _ty + _th // 2),
+               rc.font, rc.font_size * 0.85, rc.color_best_runway, rc.font_thickness + 1, cv.LINE_AA)
 
     # ---- Retângulo da pista ATUAL (branco, mais grosso) ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       heading_deg, rc.color_runway, 3)
-    draw_reference_point(img, center, comprimento, heading_deg,
-                         rc.color_point_ref, rc.point_ref_size)
-    draw_reference_point(img, center, comprimento, heading_deg + 180,
+    # Bolinha apenas no extremo norte da pista branca (sem texto)
+    draw_reference_point(img, center, comprimento, _north_h(heading_deg),
                          rc.color_point_ref, rc.point_ref_size)
 
     # ---- Parâmetros de texto ----
@@ -480,73 +487,80 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     n_frames=config.render.max_spin_deg + n_final_frames,
                 )
 
-                # ---- GIF frames: spin 0→359° + 30 fixos (destinados ao GIF 360°) ----
-                gif_frames_folder = os.path.join(
-                    config.output.data_gold, "exports", station, f"{years}y", "gif_frames"
-                )
-                os.makedirs(gif_frames_folder, exist_ok=True)
-
-                # Reutiliza melhor posição final para a segunda metade do giro (180-359°)
-                _best_h_gif: float = 0.0
-                _best_fo_gif: float = 0.0
-
-                for gif_idx in range(config.render.max_spin_deg * 2):
-                    heading_gif = float(gif_idx)
-                    # FO não muda após 179° — map só tem chaves 0-179
-                    fo_gif = fo_map.get(heading_gif % config.render.max_spin_deg,
-                                        fo_map.get(int(heading_gif % config.render.max_spin_deg), 0.0))
-
-                    # Atualiza melhor posição apenas na primeira metade (0-179°)
-                    if gif_idx < config.render.max_spin_deg and fo_gif > _best_fo_gif:
-                        _best_fo_gif = fo_gif
-                        _best_h_gif  = heading_gif
-
-                    _render_frame(
-                        base_image=base_image,
-                        comprimento=comprimento,
-                        crosswind_r=crosswind_r,
-                        center=rose_center,
-                        best_heading=_best_h_gif,
-                        best_fo=_best_fo_gif,
-                        heading_deg=heading_gif,
-                        fo_pct=fo_gif,
-                        station_name=station,
-                        lat=lat,
-                        lon=lon,
-                        declination=declination,
-                        years=years,
-                        frame_idx=gif_idx,
-                        frames_folder=gif_frames_folder,
-                        config=config,
+                # ---- GIF frames: spin 0→359° + 30 fixos (GIF 360°) — bloco isolado ----
+                try:
+                    gif_frames_folder = os.path.join(
+                        config.output.data_gold, "exports", station, f"{years}y", "gif_frames"
                     )
+                    os.makedirs(gif_frames_folder, exist_ok=True)
 
-                # Frames finais fixos para o GIF
-                for i in range(n_final_frames):
-                    _render_frame(
-                        base_image=base_image,
-                        comprimento=comprimento,
-                        crosswind_r=crosswind_r,
-                        center=rose_center,
-                        best_heading=best_heading_final,
-                        best_fo=fo_best,
-                        heading_deg=best_heading_final,
-                        fo_pct=fo_best,
-                        station_name=station,
-                        lat=lat,
-                        lon=lon,
-                        declination=declination,
+                    _best_h_gif: float  = 0.0
+                    _best_fo_gif: float = 0.0
+
+                    for gif_idx in range(config.render.max_spin_deg * 2):
+                        heading_gif = float(gif_idx)
+                        # fo_map cobre 0-179; para 180-359 usa o espelho (heading % 180)
+                        _key_int = int(heading_gif) % config.render.max_spin_deg
+                        fo_gif   = fo_map.get(float(_key_int), fo_map.get(_key_int, 0.0))
+
+                        # Verde só é atualizado na primeira meia-volta
+                        if gif_idx < config.render.max_spin_deg and fo_gif > _best_fo_gif:
+                            _best_fo_gif = fo_gif
+                            _best_h_gif  = heading_gif
+
+                        _render_frame(
+                            base_image=base_image,
+                            comprimento=comprimento,
+                            crosswind_r=crosswind_r,
+                            center=rose_center,
+                            best_heading=_best_h_gif,
+                            best_fo=_best_fo_gif,
+                            heading_deg=heading_gif,
+                            fo_pct=fo_gif,
+                            station_name=station,
+                            lat=lat,
+                            lon=lon,
+                            declination=declination,
+                            years=years,
+                            frame_idx=gif_idx,
+                            frames_folder=gif_frames_folder,
+                            config=config,
+                        )
+
+                    # Frames finais fixos para o GIF
+                    for i in range(n_final_frames):
+                        _render_frame(
+                            base_image=base_image,
+                            comprimento=comprimento,
+                            crosswind_r=crosswind_r,
+                            center=rose_center,
+                            best_heading=best_heading_final,
+                            best_fo=fo_best,
+                            heading_deg=best_heading_final,
+                            fo_pct=fo_best,
+                            station_name=station,
+                            lat=lat,
+                            lon=lon,
+                            declination=declination,
+                            years=years,
+                            frame_idx=config.render.max_spin_deg * 2 + i,
+                            frames_folder=gif_frames_folder,
+                            config=config,
+                        )
+
+                    log.info(
+                        "GIF frames gerados (360°)",
+                        station=station,
                         years=years,
-                        frame_idx=config.render.max_spin_deg * 2 + i,
-                        frames_folder=gif_frames_folder,
-                        config=config,
+                        n_frames=config.render.max_spin_deg * 2 + n_final_frames,
                     )
-
-                log.info(
-                    "GIF frames gerados (360°)",
-                    station=station,
-                    years=years,
-                    n_frames=config.render.max_spin_deg * 2 + n_final_frames,
-                )
+                except Exception as exc_gif:
+                    log.warning(
+                        "Falha nos GIF frames (nao critico)",
+                        station=station,
+                        years=years,
+                        error=str(exc_gif),
+                    )
 
             except Exception as exc:
                 log.error(

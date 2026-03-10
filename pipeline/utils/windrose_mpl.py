@@ -33,11 +33,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Paleta de cores RGB para cada banda — idêntica ao vídeo
-# Índices: 0=[0-3] 1=[3-13] 2=[13-20] 3=[20-25] 4=[25-40] 5=[40+]
-# ---------------------------------------------------------------------------
-_BAND_COLORS_RGB: List[Tuple[float, float, float]] = [
+# Paleta padrão — pode ser sobrescrita por config_runway.json na instância
+_BAND_COLORS_RGB_DEFAULT: List[Tuple[float, float, float]] = [
     (0.706, 0.706, 0.706),   # [0-3]   cinza claro
     (0.118, 0.392, 1.000),   # [3-13]  azul forte
     (0.157, 1.000, 0.157),   # [13-20] verde vibrante
@@ -90,6 +87,18 @@ class WindRosePlotter:
 
         # Número de setores (sempre 16 conforme RBAC154)
         self.n_sectors: int = 16
+
+        # Paleta de cores — carregada de windrose_band_colors_rgb se disponível
+        if "windrose_band_colors_rgb" in cfg:
+            raw = cfg["windrose_band_colors_rgb"]
+            if isinstance(raw, list) and len(raw) >= 6:
+                self.band_colors: List[Tuple[float, float, float]] = [
+                    (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in raw
+                ]
+            else:
+                self.band_colors = list(_BAND_COLORS_RGB_DEFAULT)
+        else:
+            self.band_colors = list(_BAND_COLORS_RGB_DEFAULT)
 
     # ------------------------------------------------------------------
     # API pública
@@ -179,8 +188,8 @@ class WindRosePlotter:
 
         for b in range(n_bands):
             heights = freq_pct[:, b]
-            color_idx = min(b, len(_BAND_COLORS_RGB) - 1)
-            color = _BAND_COLORS_RGB[color_idx]
+            color_idx = min(b, len(self.band_colors) - 1)
+            color = self.band_colors[color_idx]
 
             ax.bar(
                 angles_rad,
