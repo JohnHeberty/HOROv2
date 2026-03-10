@@ -92,18 +92,43 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
             pass
 
     wait_click("#declinationHTML")
+    
+    # DEBUG: salva screenshot antes de clicar Calculate
+    try:
+        driver.save_screenshot("data/silver/noaa_before_calc.png")
+        log.debug("Screenshot salvo", path="data/silver/noaa_before_calc.png")
+    except Exception:
+        pass
+    
     wait_click("#calcbutton")
-    time.sleep(2)
+    time.sleep(8)  # Espera mais longa para o cálculo completar no servidor NOAA
+    
+    # DEBUG: salva screenshot depois do cálculo
+    try:
+        driver.save_screenshot("data/silver/noaa_after_calc.png")
+        log.debug("Screenshot salvo", path="data/silver/noaa_after_calc.png")
+    except Exception:
+        pass
 
     try:
         data_find = datetime.now().strftime("%Y-%m-%d")
-        el = WebDriverWait(driver, timeout).until(
+        log.debug("Buscando resultado", date_pattern=data_find)
+        el = WebDriverWait(driver, timeout * 2).until(  # timeout dobrado para aguardar resultado
             EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{data_find}')]"))
         )
         parent = el.find_element(By.XPATH, "./..")
         children = parent.find_elements(By.XPATH, ".//*")
         Declination = children[1].text.split("changing")[0].strip().upper()
-    except Exception:
+        log.debug("Resultado encontrado", declination_raw=Declination)
+    except Exception as exc:
+        # Salva o HTML da página para debug
+        try:
+            html_path = "data/silver/noaa_page_source.html"
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            log.error("Erro ao extrair resultado — HTML salvo", error=str(exc)[:500], html_path=html_path)
+        except Exception:
+            log.error("Erro ao extrair resultado", error=str(exc)[:500])
         pass
 
     driver.delete_all_cookies()
