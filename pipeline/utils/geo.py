@@ -47,8 +47,9 @@ def latlon_to_grau_minuto(
     lat_g, lat_m, lat_s = decimal_to_dms(abs(latitude))
     lon_g, lon_m, lon_s = decimal_to_dms(abs(longitude))
 
-    lat_str = f"{lat_g}° {lat_m}' {lat_s}''"
-    lon_str = f"{lon_g}° {lon_m}' {lon_s}''"
+    # Usa "deg" em vez de símbolo ° (OpenCV não suporta Unicode)
+    lat_str = f"{lat_g}deg {lat_m}' {lat_s}''"
+    lon_str = f"{lon_g}deg {lon_m}' {lon_s}''"
 
     return lat_str, lat_dir, lon_str, lon_dir
 

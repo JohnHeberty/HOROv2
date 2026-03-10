@@ -428,8 +428,8 @@ def _render_frame(
             windrose_resized = cv.resize(windrose_img, (target_width, target_height), 
                                         interpolation=cv.INTER_LANCZOS4)
             
-            # Posiciona abaixo da declinação, alinhada à direita com as informações de cima
-            wr_y_start = decl_y + int(lspace * 2)
+            # Posiciona na mesma altura da legenda (lado direito)
+            wr_y_start = legend_y_start
             wr_x_start = rx  # Alinhado com as informações de cima
             
             # Certifica que não ultrapassa os limites
