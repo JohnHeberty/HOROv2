@@ -108,25 +108,54 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
     wait_click("#calcbutton")
     time.sleep(8)  # Espera mais longa para o cálculo completar no servidor NOAA
     
-    # Extrai a imagem da rosa dos ventos (mapa com seta de declinação)
+    # Extrai a imagem da rosa dos ventos do popup "Declination"
     try:
-        # Aguarda o mapa carregar
+        # Aguarda o popup carregar
         time.sleep(3)
         
-        # Busca o elemento do mapa Leaflet
-        try:
-            map_element = driver.find_element(By.CSS_SELECTOR, '.leaflet-container')
-            
-            # Faz screenshot apenas do elemento do mapa
+        # Busca o popup/modal "Declination" que aparece após o cálculo
+        # Possíveis seletores: .modal-content, .modal-dialog, [role="dialog"], etc
+        popup_selectors = [
+            '.modal-content',  # Bootstrap modal
+            '.modal-dialog',
+            '[role="dialog"]',
+            '#declinationModal',
+            '.ui-dialog',  # jQuery UI dialog
+            '.popup',
+            'div[style*="position: absolute"]',  # Popup posicionado
+        ]
+        
+        popup_element = None
+        for selector in popup_selectors:
+            try:
+                popup_element = driver.find_element(By.CSS_SELECTOR, selector)
+                if popup_element.is_displayed():
+                    log.debug(f"Popup encontrado com seletor: {selector}")
+                    break
+            except Exception:
+                continue
+        
+        if popup_element:
+            # Faz screenshot apenas do popup
             windrose_path = "data/silver/noaa_windrose.png"
-            map_element.screenshot(windrose_path)
-            log.info("Rosa dos ventos NOAA extraída", path=windrose_path)
-            
-        except Exception as e:
-            # Fallback: screenshot da página inteira
-            log.warning("Falha ao extrair elemento do mapa, usando screenshot completo", error=str(e))
-            driver.save_screenshot("data/silver/noaa_after_calc.png")
-            log.info("Screenshot NOAA salvo (fallback)", path="data/silver/noaa_after_calc.png")
+            popup_element.screenshot(windrose_path)
+            log.info("Rosa dos ventos NOAA extraída (popup)", path=windrose_path)
+        else:
+            # Fallback: tenta encontrar qualquer div com title="Declination" ou texto "Declination"
+            try:
+                # Procura pelo título do popup
+                title_element = driver.find_element(By.XPATH, "//*[contains(text(), 'Declination')]")
+                # Sobe na hierarquia até encontrar o container do popup
+                popup_element = title_element.find_element(By.XPATH, "./ancestor::div[contains(@class, 'modal') or contains(@class, 'dialog') or contains(@class, 'popup')]")
+                
+                windrose_path = "data/silver/noaa_windrose.png"
+                popup_element.screenshot(windrose_path)
+                log.info("Rosa dos ventos NOAA extraída (popup via XPath)", path=windrose_path)
+            except Exception as e:
+                # Último fallback: screenshot da página inteira
+                log.warning("Popup não encontrado, usando screenshot completo", error=str(e))
+                driver.save_screenshot("data/silver/noaa_after_calc.png")
+                log.info("Screenshot NOAA salvo (fallback página completa)", path="data/silver/noaa_after_calc.png")
             
     except Exception as e:
         log.warning("Erro ao salvar imagem NOAA", error=str(e))
