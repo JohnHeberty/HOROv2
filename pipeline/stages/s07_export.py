@@ -98,14 +98,40 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     log.error("Falha ao gerar vídeo", station=station, error=str(exc))
                     raise ExportError(f"[{station}/{years}y vídeo] {exc}") from exc
 
-                # --- GIF ---
+                # --- GIF (360°: usa gif_frames/) ---
                 try:
-                    gif_path = os.path.splitext(video_path)[0] + ".gif"
-                    create_gif(
-                        video_path=video_path,
-                        output_gif=gif_path,
-                        speed_multiplier=rc.gif_speed_multiplier,
+                    gif_frames_folder = os.path.join(
+                        config.output.data_gold, "exports", station, f"{years}y", "gif_frames"
                     )
+                    gif_path = os.path.splitext(video_path)[0] + ".gif"
+
+                    if os.path.isdir(gif_frames_folder):
+                        # Constrói vídeo temporário a partir dos frames 360° e converte para GIF
+                        _gif_tmp_video = os.path.splitext(video_path)[0] + "_gif_tmp.mp4"
+                        create_video(
+                            frames_folder=gif_frames_folder,
+                            output_path=_gif_tmp_video,
+                            width=rc.image_width,
+                            height=rc.image_height,
+                            fps=rc.fps_video,
+                        )
+                        create_gif(
+                            video_path=_gif_tmp_video,
+                            output_gif=gif_path,
+                            speed_multiplier=rc.gif_speed_multiplier,
+                        )
+                        # Remove vídeo temporário
+                        try:
+                            os.remove(_gif_tmp_video)
+                        except OSError:
+                            pass
+                    else:
+                        # Fallback: usa vídeo principal (180°)
+                        create_gif(
+                            video_path=video_path,
+                            output_gif=gif_path,
+                            speed_multiplier=rc.gif_speed_multiplier,
+                        )
                     log.info("GIF gerado", station=station, years=years, path=gif_path)
                 except Exception as exc:
                     log.warning("Falha ao gerar GIF (não crítico)", station=station, error=str(exc))

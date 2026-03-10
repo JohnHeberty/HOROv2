@@ -128,8 +128,43 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
     """
     Obtém a declinação magnética para cada estação Silver.
     Usa cache para evitar requisições desnecessárias.
+
+    Overrides de config_runway.json (todos opcionais):
+      - latitude / longitude → substituem as coordenadas lidas do CSV antes da consulta NOAA
+      - magnetic_declination → pula a NOAA por completo e usa o valor informado diretamente
     """
     log.info("=== STAGE 5 — ENRICH (Declinação magnética) ===")
+
+    # ------------------------------------------------------------------
+    # Override: aplica lat/lon de config_runway.json a todas as estações
+    # ------------------------------------------------------------------
+    if config.wind.latitude_override is not None or config.wind.longitude_override is not None:
+        for station, record in context.silver.items():
+            if config.wind.latitude_override is not None:
+                record.metadata.latitude = config.wind.latitude_override
+            if config.wind.longitude_override is not None:
+                record.metadata.longitude = config.wind.longitude_override
+        log.info(
+            "Coordenadas sobrescritas pelo config_runway.json",
+            lat=config.wind.latitude_override,
+            lon=config.wind.longitude_override,
+        )
+
+    # ------------------------------------------------------------------
+    # Override: declina\u00e7\u00e3o magnética direta — pula NOAA completamente
+    # ------------------------------------------------------------------
+    if config.wind.magnetic_declination_override is not None:
+        dec = config.wind.magnetic_declination_override
+        log.info(
+            "Declinação magnética sobrescrita pelo config_runway.json — consulta NOAA ignorada",
+            declination=dec,
+        )
+        for station, record in context.silver.items():
+            record.magnetic_declination = dec
+            log.info("Declinação aplicada (override)", station=station, declination=dec)
+        context.stages_executed.append("s05_enrich")
+        log.info("Stage 5 finalizado")
+        return context
 
     cache_path = os.path.join(config.output.data_silver, DECLINATIONS_CACHE_FILE)
     cache = _load_cache(cache_path)

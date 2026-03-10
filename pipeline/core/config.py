@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from glob import glob
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import cv2 as cv
 
@@ -83,6 +83,13 @@ class WindRoseConfig:
     # Limite de vento cruzado em nós — lido diretamente de config_runway.json.
     # Se não estiver no JSON, calculado automaticamente via regra RBAC154.
     crosswind_limit_kts: float = 20.0
+    # Overrides opcionais de coordenadas e declinação magnética.
+    # Se definidos, substituem os valores lidos do CSV / cache NOAA.
+    latitude_override:  Optional[float] = None
+    longitude_override: Optional[float] = None
+    # Quando informado, pula a consulta à NOAA por completo.
+    magnetic_declination_override: Optional[float] = None
+
     # Nomes dos setores por quantidade
     sector_names: Dict[int, List[str]] = field(default_factory=lambda: {
         4:  ["N",   "W",   "S",   "E"],
@@ -227,6 +234,16 @@ class PipelineConfig:
                         limits = data["wind_speed_bands_kts"]
                         if isinstance(limits, list) and len(limits) >= 3:
                             self.wind.limits_kts = limits
+
+                    # Overrides opcionais de coordenadas
+                    if data.get("latitude") is not None:
+                        self.wind.latitude_override = float(data["latitude"])
+                    if data.get("longitude") is not None:
+                        self.wind.longitude_override = float(data["longitude"])
+
+                    # Override de declinação magnética — pula NOAA quando definido
+                    if data.get("magnetic_declination") is not None:
+                        self.wind.magnetic_declination_override = float(data["magnetic_declination"])
             except Exception:
                 pass  # Se falhar, mantém o valor padrão
 

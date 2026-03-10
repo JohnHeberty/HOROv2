@@ -480,6 +480,74 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     n_frames=config.render.max_spin_deg + n_final_frames,
                 )
 
+                # ---- GIF frames: spin 0→359° + 30 fixos (destinados ao GIF 360°) ----
+                gif_frames_folder = os.path.join(
+                    config.output.data_gold, "exports", station, f"{years}y", "gif_frames"
+                )
+                os.makedirs(gif_frames_folder, exist_ok=True)
+
+                # Reutiliza melhor posição final para a segunda metade do giro (180-359°)
+                _best_h_gif: float = 0.0
+                _best_fo_gif: float = 0.0
+
+                for gif_idx in range(config.render.max_spin_deg * 2):
+                    heading_gif = float(gif_idx)
+                    # FO não muda após 179° — map só tem chaves 0-179
+                    fo_gif = fo_map.get(heading_gif % config.render.max_spin_deg,
+                                        fo_map.get(int(heading_gif % config.render.max_spin_deg), 0.0))
+
+                    # Atualiza melhor posição apenas na primeira metade (0-179°)
+                    if gif_idx < config.render.max_spin_deg and fo_gif > _best_fo_gif:
+                        _best_fo_gif = fo_gif
+                        _best_h_gif  = heading_gif
+
+                    _render_frame(
+                        base_image=base_image,
+                        comprimento=comprimento,
+                        crosswind_r=crosswind_r,
+                        center=rose_center,
+                        best_heading=_best_h_gif,
+                        best_fo=_best_fo_gif,
+                        heading_deg=heading_gif,
+                        fo_pct=fo_gif,
+                        station_name=station,
+                        lat=lat,
+                        lon=lon,
+                        declination=declination,
+                        years=years,
+                        frame_idx=gif_idx,
+                        frames_folder=gif_frames_folder,
+                        config=config,
+                    )
+
+                # Frames finais fixos para o GIF
+                for i in range(n_final_frames):
+                    _render_frame(
+                        base_image=base_image,
+                        comprimento=comprimento,
+                        crosswind_r=crosswind_r,
+                        center=rose_center,
+                        best_heading=best_heading_final,
+                        best_fo=fo_best,
+                        heading_deg=best_heading_final,
+                        fo_pct=fo_best,
+                        station_name=station,
+                        lat=lat,
+                        lon=lon,
+                        declination=declination,
+                        years=years,
+                        frame_idx=config.render.max_spin_deg * 2 + i,
+                        frames_folder=gif_frames_folder,
+                        config=config,
+                    )
+
+                log.info(
+                    "GIF frames gerados (360°)",
+                    station=station,
+                    years=years,
+                    n_frames=config.render.max_spin_deg * 2 + n_final_frames,
+                )
+
             except Exception as exc:
                 log.error(
                     "Falha na otimizacao",
