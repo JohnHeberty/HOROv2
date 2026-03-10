@@ -120,8 +120,8 @@ class RenderConfig:
     image_width: int = 1920
     image_height: int = 1080
     font: int = cv.FONT_HERSHEY_SIMPLEX
-    font_size: float = 0.90
-    font_thickness: int = 1
+    font_size: float = 1.05  # Aumentado levemente
+    font_thickness: int = 2   # Negrito
     gif_speed_multiplier: int = 4
     fps_video: int = 10
     wind_rose_proportion: float = 0.2242  # Raio da rosa (mais 5% de redução: 0.236 → 0.2242)

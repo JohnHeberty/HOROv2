@@ -139,10 +139,8 @@ def _build_base_image(
             if pct <= 0.0:
                 continue
 
-            # Degradê suave: cores variam de 35% (pouco vento) até 100% (muito vento) dentro da banda
-            brightness = 0.35 + 0.65 * (pct / max_pct)
-            color = tuple(min(255, int(c * brightness)) for c in base_bgr)
-            image[cell_mask] = color
+            # Cor sólida da legenda — sem degrêê
+            image[cell_mask] = base_bgr
 
     # ---- Bordas dos círculos concêntricos (branco) ----
     for i, limit in enumerate(limits):
@@ -219,7 +217,7 @@ def _draw_color_legend(
     ]
     
     # Título da legenda (padronizado com os outros textos)
-    cv.putText(image, "Wind Speed:", (start_x, start_y - 15),
+    cv.putText(image, "WIND SPEED:", (start_x, start_y - 15),
                rc.font, rc.font_size, (255, 255, 255), rc.font_thickness, cv.LINE_AA)
     
     # Desenha cada banda
@@ -372,11 +370,11 @@ def _render_frame(
         "BEST DIRECTION",
         f"FO: {best_fo:.2f}%",
         f"RUMO: {int(best_heading):03d}",
-        f"RUNWAY ORIENTATION: {headboard_runway(best_heading)}",
+        f"ORIENTATION: {headboard_runway(best_heading)}",
         f"CROSS WIND: {cross_best:.2f}%",
     ]
     for i, line in enumerate(left_lines):
-        cv.putText(img, line, (lx, ly0 + i * lspace),
+        cv.putText(img, line.upper(), (lx, ly0 + i * lspace),
                    font, fsize, (0, 255, 0), fthick, cv.LINE_AA)
 
     # ---- Painel ESQUERDO MEIO — pista atual (branco) ----
@@ -385,11 +383,11 @@ def _render_frame(
         "DIRECTION NOW",
         f"FO: {fo_pct:.2f}%",
         f"RUMO: {int(heading_deg):03d}",
-        f"RUNWAY ORIENTATION: {headboard_runway(heading_deg)}",
+        f"ORIENTATION: {headboard_runway(heading_deg)}",
         f"CROSS WIND: {cross_now:.2f}%",
     ]
     for i, line in enumerate(white_lines):
-        cv.putText(img, line, (lx, ly_white + i * lspace),
+        cv.putText(img, line.upper(), (lx, ly_white + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
     
     # ---- Legenda de cores (ESQUERDO INFERIOR, equidistante) ----
@@ -401,19 +399,19 @@ def _render_frame(
     rx = rc.legend_x_right
     ry0_info = lspace * 2
     info_lines = [
-        f"Station: {station_name}",
-        f"{years}-year window",
-        f"Lat: {lat_dms} {lat_dir}",
-        f"Lon: {lon_dms} {lon_dir}",
+        f"STATION: {station_name.upper()}",
+        f"WINDOW: {years} YEARS",
+        f"LAT: {lat_dms} {lat_dir}",
+        f"LON: {lon_dms} {lon_dir}",
     ]
     for i, line in enumerate(info_lines):
         cv.putText(img, line, (rx, ry0_info + i * lspace),
                    font, fsize, (210, 210, 210), fthick, cv.LINE_AA)
     
     # ---- Declinação magnética (lado DIREITO, abaixo da info) ----
-    # Usa " deg" (ASCII) pois fontes OpenCV HERSHEY não suportam símbolo de grau
+    # Usa " DEG" (ASCII) pois fontes OpenCV HERSHEY não suportam símbolo de grau
     decl_y = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
-    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f} deg", (rx, decl_y),
+    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f} DEG", (rx, decl_y),
                font, fsize, (255, 200, 100), fthick, cv.LINE_AA)
     
     # ---- Rosa dos ventos NOAA (lado DIREITO, alinhada) ----
