@@ -76,19 +76,13 @@ class WindRoseConfig:
     # Limites fora da PPD (vento de través)
     limits_out_ppd: List[float] = field(default_factory=lambda: [20, 25, 40])
     
-    # Comprimento de pista de referência (m) - define limite de crosswind conforme RBAC154:
+    # Comprimento de pista de referência (m) - usado como fallback RBAC154
     # >= 1500m → 20kt  |  1200-1500m → 13kt  |  < 1200m → 10kt
     runway_length_m: float = 1500.0
-    
-    @property
-    def crosswind_limit_kts(self) -> float:
-        """Calcula limite de vento cruzado baseado no comprimento da pista (RBAC154)."""
-        if self.runway_length_m >= 1500:
-            return 20.0
-        elif self.runway_length_m >= 1200:
-            return 13.0
-        else:
-            return 10.0
+
+    # Limite de vento cruzado em nós — lido diretamente de config_runway.json.
+    # Se não estiver no JSON, calculado automaticamente via regra RBAC154.
+    crosswind_limit_kts: float = 20.0
     # Nomes dos setores por quantidade
     sector_names: Dict[int, List[str]] = field(default_factory=lambda: {
         4:  ["N",   "W",   "S",   "E"],
@@ -211,7 +205,7 @@ class PipelineConfig:
             os.makedirs(path, exist_ok=True)
 
     def load_runway_config(self) -> None:
-        """Carrega comprimento de pista e limites de velocidade do arquivo config_runway.json se existir."""
+        """Carrega configuração de pista do arquivo config_runway.json se existir."""
         config_path = os.path.join(_REPO_ROOT, "config_runway.json")
         if os.path.exists(config_path):
             try:
@@ -219,6 +213,15 @@ class PipelineConfig:
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.wind.runway_length_m = float(data.get("runway_length_m", 1500))
+
+                    # Limite de crosswind — sempre calculado pela regra RBAC154
+                    # conforme comprimento de pista (runway_length_m):
+                    #   >= 1500 m → 20 kt | 1200–1500 m → 13 kt | < 1200 m → 10 kt
+                    rl = self.wind.runway_length_m
+                    self.wind.crosswind_limit_kts = (
+                        20.0 if rl >= 1500 else 13.0 if rl >= 1200 else 10.0
+                    )
+
                     # Carrega limites de velocidade personalizados
                     if "wind_speed_bands_kts" in data:
                         limits = data["wind_speed_bands_kts"]

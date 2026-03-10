@@ -26,6 +26,7 @@ from pipeline.core.models import PipelineContext
 # Importa estágios
 # ---------------------------------------------------------------------------
 from pipeline.stages import (
+    s00_merge_raw,
     s01_ingest,
     s02_validate,
     s03_transform,
@@ -102,6 +103,10 @@ def run_pipeline(
     Returns:
         PipelineContext preenchido ao final da execução.
     """
+    # Stage 0: mescla múltiplos CSVs da mesma estação ANTES de ler os arquivos
+    if not dry_run:
+        s00_merge_raw.run(config=cfg)
+
     context = build_context(station_filter)
 
     for stage_name in STAGE_NAMES:

@@ -83,7 +83,8 @@ class WindRosePlotter:
         # Bandas de velocidade configuráveis
         self.bands: List[float] = cfg.get("wind_speed_bands_kts", [3, 13, 20, 25, 40])
 
-        # Comprimento de pista e limite de crosswind
+        # Comprimento de pista e limite de crosswind — sempre via RBAC154:
+        #   >= 1500 m → 20 kt | 1200–1500 m → 13 kt | < 1200 m → 10 kt
         self.runway_length_m: float = float(cfg.get("runway_length_m", 1500))
         self.crosswind_limit: float = _crosswind_limit(self.runway_length_m)
 

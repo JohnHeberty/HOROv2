@@ -1,12 +1,12 @@
 {
   "runway_length_m": 1500,
-  "description": "Comprimento de pista de referência em metros (RBAC154)",
-  "crosswind_limits": {
+  "description": "Comprimento de pista de referência em metros (RBAC154). O limite de vento cruzado é calculado automaticamente:",
+  "crosswind_limits_rbac154": {
     ">=1500m": "20 kt (37 km/h)",
     "1200-1500m": "13 kt (24 km/h)",
     "<1200m": "10 kt (19 km/h)"
   },
   "wind_speed_bands_kts": [3, 13, 20, 25, 40],
   "band_description": "Limites das bandas de velocidade do vento em nós. Cria bandas: [0-3], [3-13], [13-20], [20-25], [25-40], [40+]",
-  "note": "Altere 'runway_length_m' conforme o comprimento da pista do aeroporto"
+  "note": "Altere 'runway_length_m' para mudar automaticamente o limite de crosswind conforme RBAC154."
 }
