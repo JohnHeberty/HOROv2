@@ -350,7 +350,6 @@ def _render_frame(
         "BEST DIRECTION",
         f"FO: {best_fo:.2f}%",
         f"RUMO: {int(best_heading):03d}",
-        f"MAGNETIC DECLINATION: {declination:.1f}",
         f"RUNWAY ORIENTATION: {headboard_runway(best_heading)}",
         f"CROSS WIND: {cross_best:.2f}%",
     ]
@@ -365,7 +364,6 @@ def _render_frame(
         "DIRECTION NOW",
         f"FO: {fo_pct:.2f}%",
         f"RUMO: {int(heading_deg):03d}",
-        f"MAGNETIC DECLINATION: {declination:.1f}",
         f"RUNWAY ORIENTATION: {headboard_runway(heading_deg)}",
         f"CROSS WIND: {cross_now:.2f}%",
     ]
@@ -373,23 +371,28 @@ def _render_frame(
         cv.putText(img, line, (lx, ly_white + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
     
-    # ---- Info do aeroporto (lado DIREITO) ----
+    # ---- Info do aeroporto (lado DIREITO superior) ----
     lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
+    rx = rc.legend_x_right
+    ry0_info = lspace * 2
     info_lines = [
         f"Station: {station_name}",
         f"{years}-year window",
         f"Lat: {lat_dms} {lat_dir}",
         f"Lon: {lon_dms} {lon_dir}",
     ]
-    rx = rc.legend_x_right
-    ry0_info = lspace * 2
     for i, line in enumerate(info_lines):
         cv.putText(img, line, (rx, ry0_info + i * lspace),
                    font, fsize, (210, 210, 210), fthick, cv.LINE_AA)
     
-    # ---- Legenda de cores (lado direito, abaixo da info) ----
-    legend_x_pos = rc.image_width - 280
-    legend_y_start = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
+    # ---- Declinação magnética (lado DIREITO, abaixo da info) ----
+    decl_y = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
+    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f}°", (rx, decl_y),
+               font, fsize, (255, 200, 100), fthick, cv.LINE_AA)
+    
+    # ---- Legenda de cores (canto INFERIOR ESQUERDO) ----
+    legend_x_pos = lx
+    legend_y_start = rc.image_height - 350  # 350px do fundo
     _draw_color_legend(img, config, legend_x_pos, legend_y_start)
 
     # ---- Salva frame (contorno para caminhos não-ASCII no Windows) ----
