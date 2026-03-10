@@ -197,11 +197,11 @@ def _draw_color_legend(
     rc = config.render
     wc = config.wind
     
-    # Dimensões de cada retângulo de cor
-    box_width = 40
-    box_height = 25
-    text_offset_x = box_width + 10
-    line_spacing = box_height + 8
+    # Dimensões de cada retângulo de cor (maior para melhor visualização)
+    box_width = 70
+    box_height = 40
+    text_offset_x = box_width + 15
+    line_spacing = box_height + 12
     
     # Monta as labels das bandas
     limits = wc.limits_kts
@@ -214,9 +214,9 @@ def _draw_color_legend(
         f"[{limits[4]:.0f}+ kt]",
     ]
     
-    # Título da legenda
-    cv.putText(image, "Wind Speed:", (start_x, start_y - 10),
-               rc.font, 0.7, (255, 255, 255), 2, cv.LINE_AA)
+    # Título da legenda (maior e mais destacado)
+    cv.putText(image, "Wind Speed:", (start_x, start_y - 15),
+               rc.font, 0.9, (255, 255, 255), 2, cv.LINE_AA)
     
     # Desenha cada banda
     for i, (color_bgr, label) in enumerate(zip(rc.video_band_colors_bgr, band_labels)):
@@ -234,10 +234,10 @@ def _draw_color_legend(
                     (start_x + box_width, y_pos + box_height),
                     (255, 255, 255), 2)
         
-        # Label da banda
+        # Label da banda (texto maior)
         cv.putText(image, label,
-                  (start_x + text_offset_x, y_pos + box_height - 5),
-                  rc.font, 0.6, (255, 255, 255), 1, cv.LINE_AA)
+                  (start_x + text_offset_x, y_pos + box_height - 10),
+                  rc.font, 0.8, (255, 255, 255), 2, cv.LINE_AA)
 
 
 # ---------------------------------------------------------------------------
@@ -357,9 +357,10 @@ def _render_frame(
         cv.putText(img, line, (rx, ry0 + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
     
-    # ---- Legenda de cores (abaixo do painel direito) ----
-    legend_y_start = ry0 + len(right_lines) * lspace + lspace
-    _draw_color_legend(img, config, rx, legend_y_start)
+    # ---- Legenda de cores (lado direito, posição fixa mais à direita) ----
+    legend_x_pos = rc.image_width - 280  # Posição fixa no canto direito
+    legend_y_start = ry0 + len(right_lines) * lspace + int(lspace * 1.5)
+    _draw_color_legend(img, config, legend_x_pos, legend_y_start)
 
     # ---- Painel ESQUERDO — melhor pista (verde) — sempre visível ----
     lx  = rc.legend_x_left
