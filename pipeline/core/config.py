@@ -113,7 +113,8 @@ class RenderConfig:
     gif_speed_multiplier: int = 4
     fps_video: int = 10
     wind_rose_proportion: float = 0.18  # Raio da rosa (0.18 para visualização compacta)
-    background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro (BGR)
+    background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro da imagem (BGR)
+    windrose_background: tuple = (70, 70, 70)  # Fundo cinza claro da rosa dos ventos (BGR)
     color_runway: tuple = (255, 255, 255)
     color_best_runway: tuple = (0, 255, 0)
     color_point_ref: tuple = (255, 165, 0)
@@ -210,7 +211,7 @@ class PipelineConfig:
             os.makedirs(path, exist_ok=True)
 
     def load_runway_config(self) -> None:
-        """Carrega comprimento de pista do arquivo config_runway.json se existir."""
+        """Carrega comprimento de pista e limites de velocidade do arquivo config_runway.json se existir."""
         config_path = os.path.join(_REPO_ROOT, "config_runway.json")
         if os.path.exists(config_path):
             try:
@@ -218,6 +219,11 @@ class PipelineConfig:
                 with open(config_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self.wind.runway_length_m = float(data.get("runway_length_m", 1500))
+                    # Carrega limites de velocidade personalizados
+                    if "wind_speed_bands_kts" in data:
+                        limits = data["wind_speed_bands_kts"]
+                        if isinstance(limits, list) and len(limits) >= 3:
+                            self.wind.limits_kts = limits
             except Exception:
                 pass  # Se falhar, mantém o valor padrão
 

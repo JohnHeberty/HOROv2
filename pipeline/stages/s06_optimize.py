@@ -105,6 +105,9 @@ def _build_base_image(
 
     # ---- Fundo cinza escuro ----
     image = np.full((H, W, 3), rc.background_gray, dtype=np.uint8)
+    
+    # ---- Círculo de fundo da rosa dos ventos (cinza mais claro) ----
+    cv.circle(image, center, comprimento, rc.windrose_background, -1)
 
     # ---- Grades de coordenadas polares ----
     Yg, Xg = np.ogrid[:H, :W]
