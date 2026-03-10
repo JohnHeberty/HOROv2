@@ -114,7 +114,6 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
         time.sleep(3)
         
         # Busca o popup/modal "Declination" que aparece após o cálculo
-        # Possíveis seletores: .modal-content, .modal-dialog, [role="dialog"], etc
         popup_selectors = [
             '.modal-content',  # Bootstrap modal
             '.modal-dialog',
@@ -136,10 +135,29 @@ def _fetch_declination(lat: float, lon: float, driver, timeout: int = 60) -> flo
                 continue
         
         if popup_element:
-            # Faz screenshot apenas do popup
+            # Tenta encontrar o conteúdo interno do popup (sem o header/título)
+            content_selectors = [
+                '.modal-body',      # Bootstrap modal body
+                '.ui-dialog-content',  # jQuery UI content
+                'div[class*="content"]',  # Qualquer div com "content"
+            ]
+            
+            content_element = None
+            for content_selector in content_selectors:
+                try:
+                    content_element = popup_element.find_element(By.CSS_SELECTOR, content_selector)
+                    if content_element.is_displayed():
+                        log.debug(f"Conteúdo do popup encontrado: {content_selector}")
+                        break
+                except Exception:
+                    continue
+            
+            # Se encontrou o conteúdo interno, captura só ele; senão captura o popup todo
+            element_to_capture = content_element if content_element else popup_element
             windrose_path = "data/silver/noaa_windrose.png"
-            popup_element.screenshot(windrose_path)
-            log.info("Rosa dos ventos NOAA extraída (popup)", path=windrose_path)
+            element_to_capture.screenshot(windrose_path)
+            log.info("Rosa dos ventos NOAA extraída (popup)", path=windrose_path, 
+                    captured="content" if content_element else "full_popup")
         else:
             # Fallback: tenta encontrar qualquer div com title="Declination" ou texto "Declination"
             try:
