@@ -45,12 +45,16 @@ from pipeline.services.wind import (
     pistas_possiveis,
 )
 from pipeline.utils.geo import latlon_to_grau_minuto
+from pipeline.utils.windrose_mpl import WindRosePlotter
 
 log = get_logger("s06_optimize")
 
 # Janelas temporais serão calculadas dinamicamente baseado nos dados disponíveis
 
 # Cores carregadas de config_runway.json via config.render.video_band_colors_bgr
+
+# Instância do plotter de windrose
+_windrose_plotter = WindRosePlotter()
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +299,7 @@ def _render_frame(
     frame_idx: int,
     frames_folder: str,
     config: PipelineConfig,
+    windrose_img: Optional[np.ndarray] = None,
 ) -> None:
     """Renderiza um único frame e salva como JPEG."""
     rc  = config.render
@@ -343,9 +348,26 @@ def _render_frame(
     cross_now  = round(100.0 - fo_pct,  2)
     cross_best = round(100.0 - best_fo, 2)
 
+    # ----- Centralização vertical dos painéis esquerdos -----
+    # Calcula altura total dos painéis + legenda
+    green_panel_lines = 5  # BEST DIRECTION + 4 linhas
+    white_panel_lines = 5  # DIRECTION NOW + 4 linhas
+    legend_lines = 7       # Wind Speed: + 6 bandas
+    
+    # Altura total dos painéis + espaçamentos
+    green_height = green_panel_lines * lspace
+    white_height = white_panel_lines * lspace
+    legend_height = legend_lines * 52  # line_spacing da legenda
+    
+    spacing_between = int(lspace * 2)  # Espaço entre painéis
+    total_height = green_height + spacing_between + white_height + spacing_between + legend_height
+    
+    # Centraliza verticalmente
+    start_y = (rc.image_height - total_height) // 2
+    
     # ---- Painel ESQUERDO SUPERIOR — melhor pista (verde) ----
     lx  = rc.legend_x_left
-    ly0 = lspace * 2
+    ly0 = start_y
     left_lines = [
         "BEST DIRECTION",
         f"FO: {best_fo:.2f}%",
@@ -358,8 +380,7 @@ def _render_frame(
                    font, fsize, (0, 255, 0), fthick, cv.LINE_AA)
 
     # ---- Painel ESQUERDO MEIO — pista atual (branco) ----
-    # Posicionado abaixo do painel verde
-    ly_white = ly0 + len(left_lines) * lspace + int(lspace * 2)
+    ly_white = ly0 + green_height + spacing_between
     white_lines = [
         "DIRECTION NOW",
         f"FO: {fo_pct:.2f}%",
@@ -370,6 +391,10 @@ def _render_frame(
     for i, line in enumerate(white_lines):
         cv.putText(img, line, (lx, ly_white + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
+    
+    # ---- Legenda de cores (ESQUERDO INFERIOR, equidistante) ----
+    legend_y_start = ly_white + white_height + spacing_between
+    _draw_color_legend(img, config, lx, legend_y_start)
     
     # ---- Info do aeroporto (lado DIREITO superior) ----
     lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
@@ -386,14 +411,36 @@ def _render_frame(
                    font, fsize, (210, 210, 210), fthick, cv.LINE_AA)
     
     # ---- Declinação magnética (lado DIREITO, abaixo da info) ----
+    # Usa chr(176) para símbolo de grau (evita problemas de encoding)
     decl_y = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
-    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f}°", (rx, decl_y),
+    decl_symbol = chr(176)  # °
+    cv.putText(img, f"MAGNETIC DECLINATION: {declination:.1f}{decl_symbol}", (rx, decl_y),
                font, fsize, (255, 200, 100), fthick, cv.LINE_AA)
     
-    # ---- Legenda de cores (canto INFERIOR ESQUERDO) ----
-    legend_x_pos = lx
-    legend_y_start = rc.image_height - 350  # 350px do fundo
-    _draw_color_legend(img, config, legend_x_pos, legend_y_start)
+    # ---- Rosa dos ventos matplotlib (lado DIREITO, centralizada) ----
+    if windrose_img is not None:
+        try:
+            # Redimensiona windrose para caber no espaço disponível
+            wr_height, wr_width = windrose_img.shape[:2]
+            target_width = 450  # Largura desejada
+            scale = target_width / wr_width
+            target_height = int(wr_height * scale)
+            
+            windrose_resized = cv.resize(windrose_img, (target_width, target_height), 
+                                        interpolation=cv.INTER_LANCZOS4)
+            
+            # Posiciona abaixo da declinação, centralizada horizontalmente no lado direito
+            wr_y_start = decl_y + int(lspace * 2)
+            wr_x_start = rx - 50  # Pequeno ajuste para centralizar melhor
+            
+            # Certifica que não ultrapassa os limites
+            if wr_y_start + target_height < rc.image_height:
+                # Insere a windrose na imagem
+                img[wr_y_start:wr_y_start + target_height, 
+                    wr_x_start:wr_x_start + target_width] = windrose_resized
+        except Exception as e:
+            # Se falhar, apenas loga mas não quebra o frame
+            log.warning("Erro ao inserir windrose no frame", error=str(e))
 
     # ---- Salva frame (contorno para caminhos não-ASCII no Windows) ----
     os.makedirs(frames_folder, exist_ok=True)
@@ -504,6 +551,33 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 base_image, comprimento, crosswind_r, rose_center = \
                     _build_base_image(df_slice, config)
 
+                # ---- Gera rosa dos ventos matplotlib para embedding nos frames ----
+                windrose_img = None
+                try:
+                    # Gera windrose PNG temporária
+                    temp_dir = os.path.join(frames_folder, "..")
+                    os.makedirs(temp_dir, exist_ok=True)
+                    
+                    windrose_path = _windrose_plotter.plot_from_config(
+                        df=df_slice,
+                        station=station,
+                        years=years,
+                        output_dir=temp_dir,
+                        declination=declination,
+                    )
+                    
+                    # Carrega windrose como array numpy
+                    windrose_img = cv.imread(windrose_path)
+                    if windrose_img is not None:
+                        log.info("Windrose matplotlib carregada", station=station, 
+                                years=years, shape=windrose_img.shape)
+                    else:
+                        log.warning("Falha ao carregar windrose PNG", station=station, 
+                                   years=years, path=windrose_path)
+                except Exception as exc:
+                    log.warning("Erro ao gerar windrose matplotlib (não crítico)", 
+                               station=station, years=years, error=str(exc))
+
                 # ---- Gera frames 0–179°: verde atualiza quando encontra novo máximo ----
                 best_h_so_far:  float = 0.0
                 best_fo_so_far: float = 0.0
@@ -534,6 +608,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         frame_idx=frame_idx,
                         frames_folder=frames_folder,
                         config=config,
+                        windrose_img=windrose_img,
                     )
                 
                 # ---- Gera frames finais FIXOS na melhor posição ----
@@ -556,6 +631,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         frame_idx=config.render.max_spin_deg + i,
                         frames_folder=frames_folder,
                         config=config,
+                        windrose_img=windrose_img,
                     )
 
                 log.info(
@@ -603,6 +679,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                             frame_idx=gif_idx,
                             frames_folder=gif_frames_folder,
                             config=config,
+                            windrose_img=windrose_img,
                         )
 
                     # Frames finais fixos para o GIF
@@ -624,6 +701,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                             frame_idx=config.render.gif_spin_deg + i,
                             frames_folder=gif_frames_folder,
                             config=config,
+                            windrose_img=windrose_img,
                         )
 
                     log.info(
