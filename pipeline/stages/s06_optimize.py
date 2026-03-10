@@ -51,16 +51,16 @@ log = get_logger("s06_optimize")
 # Janelas temporais serão calculadas dinamicamente baseado nos dados disponíveis
 
 # ---------------------------------------------------------------------------
-# Paleta de cores BGR por banda de velocidade
+# Paleta de cores BGR por banda de velocidade (cores vibrantes para degradê)
 # Índices: 0=[0-3] 1=[3-13] 2=[13-20] 3=[20-25] 4=[25-40] 5=[40+]
 # ---------------------------------------------------------------------------
 _BAND_COLORS_BGR: List[Tuple[int, int, int]] = [
-    (170, 170, 170),   # [0-3]   calmas  — cinza claro
-    (220,  80,  30),   # [3-13]  — azul
-    ( 30, 200,  30),   # [13-20] — verde
-    (  0, 220, 220),   # [20-25] — amarelo
-    (  0, 130, 255),   # [25-40] — laranja
-    (  0,   0, 210),   # [40+]   — vermelho
+    (180, 180, 180),   # [0-3]   calmas  — cinza claro
+    (255, 100,  30),   # [3-13]  — azul forte
+    ( 40, 255,  40),   # [13-20] — verde vibrante
+    (  0, 255, 255),   # [20-25] — amarelo brilhante
+    (  0, 150, 255),   # [25-40] — laranja forte
+    (  0,  30, 255),   # [40+]   — vermelho intenso
 ]
 
 
@@ -142,8 +142,8 @@ def _build_base_image(
             if pct <= 0.0:
                 continue
 
-            # Degradê mais suave e visível: cores vibrantes variando de 40% a 100% conforme frequência
-            brightness = 0.40 + 0.60 * (pct / max_pct)
+            # Degradê suave: cores variam de 35% (pouco vento) até 100% (muito vento) dentro da banda
+            brightness = 0.35 + 0.65 * (pct / max_pct)
             color = tuple(min(255, int(c * brightness)) for c in base_bgr)
             image[cell_mask] = color
 

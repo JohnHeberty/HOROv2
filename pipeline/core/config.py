@@ -100,7 +100,7 @@ class RenderConfig:
     font_thickness: int = 1
     gif_speed_multiplier: int = 4
     fps_video: int = 10
-    wind_rose_proportion: float = 0.28  # Raio da rosa em relação à imagem (0.28 para visualização ideal)
+    wind_rose_proportion: float = 0.22  # Raio da rosa (0.22 para visualização compacta e clara)
     color_runway: tuple = (255, 255, 255)
     color_best_runway: tuple = (0, 255, 0)
     color_point_ref: tuple = (255, 165, 0)
