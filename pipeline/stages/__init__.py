@@ -1,0 +1,3 @@
+"""ETL pipeline stages (s01 → s07)."""
+# Stages are imported directly by the orchestrator to avoid circular imports.
+# Use: from pipeline.stages import s01_ingest, s02_validate, ...

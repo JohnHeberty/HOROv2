@@ -1,0 +1,5 @@
+# Coloque os arquivos CSV brutos nesta pasta (data/raw/)
+# O pipeline irá processá-los automaticamente.
+# 
+# Formatos aceitos: *.csv e *.CSV
+# Encodings aceitos: qualquer (detecção automática + 7 fallbacks)

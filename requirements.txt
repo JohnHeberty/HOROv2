@@ -7,4 +7,8 @@ moviepy
 selenium
 webdriver-manager
 Unidecode
-numpy=1.26.4
+chardet
+python-dateutil
+pyarrow
+fastparquet
+numpy==1.26.4

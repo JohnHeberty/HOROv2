@@ -160,3 +160,12 @@ Modulos/DADOS/TREATED/*.pickle
 *.csv
 *.mp4
 *.gif
+
+# --- Pipeline ETL — camadas geradas automaticamente ---
+data/bronze/
+data/silver/
+data/gold/
+data/.cache/
+# Manter apenas a pasta raw (sem os arquivos CSV pessoais)
+!data/raw/
+!data/raw/.gitkeep
