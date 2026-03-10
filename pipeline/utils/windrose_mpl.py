@@ -199,9 +199,21 @@ class WindRosePlotter:
             label = f"{lo_label} – {hi_label} kt"
             legend_patches.append(mpatches.Patch(facecolor=color, edgecolor="white", label=label))
 
-        # Círculo do limite de crosswind (linha vermelha tracejada)
+        # ------------------------------------------------------------------
+        # Círculos de referência radial proporcionais aos nós reais
+        # ------------------------------------------------------------------
         r_max = bottom.max() if bottom.max() > 0 else 1.0
-        crosswind_r = r_max * 0.5  # referência visual proporcional
+        max_band_kt = float(self.bands[-1])  # e.g. 40 kt = raio total de referência
+
+        # Posição de cada limite de banda no eixo radial (proporcional ao kt)
+        r_ticks = [r_max * (kt / max_band_kt) for kt in self.bands]
+        r_labels = [f"{int(kt)} kt" for kt in self.bands]
+
+        ax.set_rticks(r_ticks)
+        ax.set_yticklabels(r_labels)
+
+        # Círculo do limite de crosswind (linha vermelha tracejada)
+        crosswind_r = r_max * (self.crosswind_limit / max_band_kt)
         theta = np.linspace(0, 2 * np.pi, 360)
         ax.plot(
             theta,
@@ -210,7 +222,6 @@ class WindRosePlotter:
             linewidth=1.5,
             linestyle="--",
             alpha=0.7,
-            label=f"Crosswind limit: {self.crosswind_limit:.0f} kt",
         )
         legend_patches.append(
             mpatches.Patch(
@@ -221,10 +232,11 @@ class WindRosePlotter:
             )
         )
 
-        # Linhas de grade radiais
+        # Linhas de grade radiais — desativa o auto e usa só as customizadas
         ax.set_rlabel_position(22.5)
         ax.tick_params(axis="y", labelsize=8, labelcolor="gray")
-        ax.grid(True, linestyle="--", linewidth=0.5, alpha=0.6)
+        ax.yaxis.grid(True, linestyle="--", linewidth=0.5, alpha=0.5, color="gray")
+        ax.xaxis.grid(True, linestyle="-", linewidth=0.4, alpha=0.4, color="gray")
 
         # Labels cardeais
         ax.set_xticks(np.radians([0, 45, 90, 135, 180, 225, 270, 315]))
