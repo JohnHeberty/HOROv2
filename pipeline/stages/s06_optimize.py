@@ -176,22 +176,6 @@ def _build_base_image(
 
 
 # ---------------------------------------------------------------------------
-# Utilitário: extremidade canônica (lado norte) de uma pista
-# ---------------------------------------------------------------------------
-def _canonical_end(h: float) -> float:
-    """
-    Retorna o extremo da pista (h ou h+180) que está mais próximo do Norte.
-    Garante que a bolinha verde sempre apareça no mesmo lado (hemisfério norte)
-    independentemente de qual direção o ângulo 'h' aponta.
-    """
-    h_n   = h % 360.0
-    recip = (h_n + 180.0) % 360.0
-    dist_h = min(h_n, 360.0 - h_n)   # distância angular até 0° (Norte)
-    dist_r = min(recip, 360.0 - recip)
-    return h_n if dist_h <= dist_r else recip
-
-
-# ---------------------------------------------------------------------------
 # Utilitário: retângulo de pista rotacionado
 # ---------------------------------------------------------------------------
 def _draw_runway_rect(
@@ -254,19 +238,18 @@ def _render_frame(
     # ---- Retângulo da MELHOR pista (verde) — na melhor posição encontrada até agora ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       best_heading, rc.color_best_runway, 2)
-    # Bolinha no extremo norte-canônico da pista verde (lado mais próximo do Norte)
-    _best_dot_h = _canonical_end(best_heading)
-    draw_reference_point(img, center, comprimento, _best_dot_h,
+    # Bolinha sempre no extremo best_heading (onde a varredura parou)
+    draw_reference_point(img, center, comprimento, best_heading,
                          (0, 210, 0), rc.point_ref_size)
 
     # ---- Numeração de pista (verde): cabeceira em cada extremo ----
     cx, cy = center
     _head_a, _head_b = headboard_runway(best_heading).split("-")  # ex: "11", "29"
-    # _head_a corresponde ao ângulo best_heading; _head_b ao oposto
-    _near_best = (abs(_best_dot_h - best_heading % 360) % 360) < 90
-    _dot_label = _head_a if _near_best else _head_b   # cabeceira no lado da bolinha
-    _far_label = _head_b if _near_best else _head_a   # cabeceira no lado oposto
-    _far_dot_h = (_best_dot_h + 180.0) % 360.0
+    # _head_a sempre corresponde ao ângulo best_heading; _head_b ao extremo oposto
+    _best_dot_h = best_heading % 360.0
+    _far_dot_h  = (_best_dot_h + 180.0) % 360.0
+    _dot_label  = _head_a   # cabeceira no lado da bolinha (best_heading)
+    _far_label  = _head_b   # cabeceira no extremo oposto
 
     _fsize_rwy = rc.font_size * 0.85
     _fthick_rwy = rc.font_thickness + 1
