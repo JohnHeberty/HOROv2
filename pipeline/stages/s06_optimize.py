@@ -142,8 +142,8 @@ def _build_base_image(
             if pct <= 0.0:
                 continue
 
-            # Cores mais saturadas e visíveis (mínimo 30%, máximo 95%)
-            brightness = 0.30 + 0.65 * (pct / max_pct)
+            # Degradê mais suave e visível: cores vibrantes variando de 40% a 100% conforme frequência
+            brightness = 0.40 + 0.60 * (pct / max_pct)
             color = tuple(min(255, int(c * brightness)) for c in base_bgr)
             image[cell_mask] = color
 
