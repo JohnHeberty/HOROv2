@@ -238,22 +238,22 @@ class WindRosePlotter:
         ax.set_facecolor("#e8e8e8")
         fig.patch.set_facecolor("white")
 
-        # Legenda
+        # Legenda (tamanho dobrado)
         ax.legend(
             handles=legend_patches,
             loc="lower left",
             bbox_to_anchor=(-0.20, -0.18),
-            fontsize=9,
+            fontsize=18,  # Dobrado de 9 para 18
             framealpha=0.9,
             title="Velocidade do vento",
-            title_fontsize=10,
+            title_fontsize=20,  # Dobrado de 10 para 20
         )
 
-        # Informações de calmos
-        calm_text = f"Calmos: {calm_pct:.1f}%  |  Total: {total} obs."
+        # Informações de ventos calmos e total de observações (mais claro)
+        calm_text = f"Ventos calmos: {calm_pct:.1f}%  |  Total: {total:,} observações".replace(",", ".")
         fig.text(
             0.5, 0.02, calm_text,
-            ha="center", va="bottom", fontsize=9, color="gray",
+            ha="center", va="bottom", fontsize=18, color="gray",  # Dobrado de 9 para 18
         )
 
         # Título

@@ -28,8 +28,41 @@ from pipeline.services.wind import calcular_tabela_ventos
 
 log = get_logger("s04_analyze")
 
-# Janelas temporais analisadas (anos)
-YEAR_WINDOWS = [5, 10, 15, 20]
+
+def _calculate_year_windows(df: pd.DataFrame) -> List[int]:
+    """
+    Calcula automaticamente quais janelas de anos fazem sentido baseado nos dados disponíveis.
+    
+    Retorna apenas janelas com pelo menos 80% de cobertura de dados.
+    Por exemplo: se tem 6 anos de dados, retorna [5, 6] (não 10, 15, 20)
+    """
+    if df.empty or "timestamp" not in df.columns:
+        return [5]  # Fallback padrão
+    
+    from dateutil.relativedelta import relativedelta
+    
+    max_date = df["timestamp"].max()
+    min_date = df["timestamp"].min()
+    
+    # Anos totais de dados disponíveis
+    total_years = relativedelta(max_date, min_date).years
+    if total_years < 1:
+        total_years = 1
+    
+    # Define janelas baseado nos dados reais
+    # Sempre inclui último ano completo
+    windows = [min(5, total_years)]  # Janela padrão de 5 anos ou total se menor
+    
+    # Adiciona janelas de 10, 15, 20 anos apenas se tiver dados suficientes
+    for window in [10, 15, 20]:
+        if total_years >= window * 0.8:  # 80% de cobertura mínima
+            windows.append(window)
+    
+    # Remove duplicatas e ordena
+    windows = sorted(list(set(windows)))
+    
+    log.debug(f"Anos de dados disponíveis: {total_years}, janelas calculadas: {windows}")
+    return windows
 
 
 def _slice_years(df: pd.DataFrame, n_years: int) -> pd.DataFrame:
@@ -69,8 +102,11 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
 
         log.info("Calculando tabelas de vento", station=station)
         context.wind_tables[station] = {}
+        
+        # Calcula automaticamente quais janelas processar baseado em dados disponíveis
+        year_windows = _calculate_year_windows(df_all)
 
-        for years in YEAR_WINDOWS:
+        for years in year_windows:
             df_slice = _slice_years(df_all, years)
             if len(df_slice) < 10:
                 log.warning(
