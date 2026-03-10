@@ -1,0 +1,10 @@
+{
+  "runway_length_m": 1500,
+  "description": "Comprimento de pista de referência em metros (RBAC154)",
+  "crosswind_limits": {
+    ">=1500m": "20 kt (37 km/h)",
+    "1200-1500m": "13 kt (24 km/h)",
+    "<1200m": "10 kt (19 km/h)"
+  },
+  "note": "Altere 'runway_length_m' conforme o comprimento da pista do aeroporto"
+}

@@ -75,8 +75,20 @@ class WindRoseConfig:
     limits_in_ppd: List[float] = field(default_factory=lambda: [3, 13, 20])
     # Limites fora da PPD (vento de través)
     limits_out_ppd: List[float] = field(default_factory=lambda: [20, 25, 40])
-    # Vento cruzado máximo permitido dentro da pista
-    crosswind_limit_kts: float = 20.0
+    
+    # Comprimento de pista de referência (m) - define limite de crosswind conforme RBAC154:
+    # >= 1500m → 20kt  |  1200-1500m → 13kt  |  < 1200m → 10kt
+    runway_length_m: float = 1500.0
+    
+    @property
+    def crosswind_limit_kts(self) -> float:
+        """Calcula limite de vento cruzado baseado no comprimento da pista (RBAC154)."""
+        if self.runway_length_m >= 1500:
+            return 20.0
+        elif self.runway_length_m >= 1200:
+            return 13.0
+        else:
+            return 10.0
     # Nomes dos setores por quantidade
     sector_names: Dict[int, List[str]] = field(default_factory=lambda: {
         4:  ["N",   "W",   "S",   "E"],
@@ -100,7 +112,8 @@ class RenderConfig:
     font_thickness: int = 1
     gif_speed_multiplier: int = 4
     fps_video: int = 10
-    wind_rose_proportion: float = 0.22  # Raio da rosa (0.22 para visualização compacta e clara)
+    wind_rose_proportion: float = 0.18  # Raio da rosa (0.18 para visualização compacta)
+    background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro (BGR)
     color_runway: tuple = (255, 255, 255)
     color_best_runway: tuple = (0, 255, 0)
     color_point_ref: tuple = (255, 165, 0)
@@ -196,6 +209,19 @@ class PipelineConfig:
         ]:
             os.makedirs(path, exist_ok=True)
 
+    def load_runway_config(self) -> None:
+        """Carrega comprimento de pista do arquivo config_runway.json se existir."""
+        config_path = os.path.join(_REPO_ROOT, "config_runway.json")
+        if os.path.exists(config_path):
+            try:
+                import json
+                with open(config_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.wind.runway_length_m = float(data.get("runway_length_m", 1500))
+            except Exception:
+                pass  # Se falhar, mantém o valor padrão
+
 
 # Instância global — reutilize em todo o pipeline
 cfg = PipelineConfig()
+cfg.load_runway_config()  # Carrega configuração de pista

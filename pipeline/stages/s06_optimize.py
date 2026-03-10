@@ -103,8 +103,8 @@ def _build_base_image(
     col_titles = get_column_titles(limits)   # ['[0-3]', '[3-13]', ..., '[25-40]', '[40-*]']
     max_pct    = float(wind_table.values.max()) or 1.0
 
-    # ---- Fundo preto ----
-    image = np.zeros((H, W, 3), dtype=np.uint8)
+    # ---- Fundo cinza escuro ----
+    image = np.full((H, W, 3), rc.background_gray, dtype=np.uint8)
 
     # ---- Grades de coordenadas polares ----
     Yg, Xg = np.ogrid[:H, :W]
@@ -165,16 +165,19 @@ def _build_base_image(
                int(cy + comprimento * np.cos(rad)))
         cv.line(image, center, p2, (80, 80, 80), 2)
 
-    # ---- Labels cardeais ----
-    cardinal = {0: "N", 90: "E", 180: "S", 270: "W"}
+    # ---- Labels cardeais e colaterais (N, NE, E, SE, S, SW, W, NW) ----
+    cardinal = {
+        0: "N", 45: "NE", 90: "E", 135: "SE", 
+        180: "S", 225: "SW", 270: "W", 315: "NW"
+    }
     for angle_deg, label in cardinal.items():
         rad    = np.radians(-angle_deg - 180)
         offset = comprimento + 35
         px     = int(cx + offset * np.sin(rad))
         py     = int(cy + offset * np.cos(rad))
-        (tw, th), _ = cv.getTextSize(label, rc.font, 1.0, 2)
+        (tw, th), _ = cv.getTextSize(label, rc.font, 0.8, 2)
         cv.putText(image, label, (px - tw // 2, py + th // 2),
-                   rc.font, 1.0, (240, 240, 240), 2, cv.LINE_AA)
+                   rc.font, 0.8, (240, 240, 240), 2, cv.LINE_AA)
 
     return image, comprimento, crosswind_r, center
 
