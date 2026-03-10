@@ -23,11 +23,6 @@ Para metodologia de cálculo FO, consulte [UPDATE.md](UPDATE.md).
 
 ---
 
-
-## ERROS CRÍTICOS (causam falha de execução)
-
----
-
 ### [ERR-01] `Functions.py` — Auto-importação circular
 **Arquivo:** `Functions.py`, linha 15  
 **Problema:** O arquivo importa a si mesmo com `from Functions import *`, causando `ImportError` ou recursão infinita ao ser carregado.  

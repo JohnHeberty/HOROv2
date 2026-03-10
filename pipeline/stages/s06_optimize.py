@@ -214,9 +214,9 @@ def _draw_color_legend(
         f"[{limits[4]:.0f}+ kt]",
     ]
     
-    # Título da legenda (maior e mais destacado)
+    # Título da legenda (padronizado com os outros textos)
     cv.putText(image, "Wind Speed:", (start_x, start_y - 15),
-               rc.font, 0.9, (255, 255, 255), 2, cv.LINE_AA)
+               rc.font, rc.font_size, (255, 255, 255), rc.font_thickness, cv.LINE_AA)
     
     # Desenha cada banda
     for i, (color_bgr, label) in enumerate(zip(rc.video_band_colors_bgr, band_labels)):
@@ -234,10 +234,10 @@ def _draw_color_legend(
                     (start_x + box_width, y_pos + box_height),
                     (255, 255, 255), 2)
         
-        # Label da banda (texto maior)
+        # Label da banda (padronizado com os outros textos)
         cv.putText(image, label,
                   (start_x + text_offset_x, y_pos + box_height - 10),
-                  rc.font, 0.8, (255, 255, 255), 2, cv.LINE_AA)
+                  rc.font, rc.font_size, (255, 255, 255), rc.font_thickness, cv.LINE_AA)
 
 
 # ---------------------------------------------------------------------------
@@ -316,8 +316,9 @@ def _render_frame(
     _dot_label  = _head_a   # cabeceira no lado da bolinha (best_heading)
     _far_label  = _head_b   # cabeceira no extremo oposto
 
-    _fsize_rwy = rc.font_size * 0.85
-    _fthick_rwy = rc.font_thickness + 1
+    # Padronização de fonte para cabeceiras (mesmo tamanho que paineis)
+    _fsize_rwy = rc.font_size
+    _fthick_rwy = rc.font_thickness
     _offs = comprimento + 55
 
     for _lbl, _ang in ((_dot_label, _best_dot_h), (_far_label, _far_dot_h)):
@@ -334,7 +335,7 @@ def _render_frame(
     # Sem bolinha na pista branca — o retângulo já indica a direção e evita
     # confusão quando heading_deg ≈ best_heading + 180° (dois extremos opostos)
 
-    # ---- Parâmetros de texto ----
+    # ---- Parâmetros de texto (padronizados) ----
     font   = rc.font
     fsize  = rc.font_size
     fthick = rc.font_thickness
@@ -342,27 +343,7 @@ def _render_frame(
     cross_now  = round(100.0 - fo_pct,  2)
     cross_best = round(100.0 - best_fo, 2)
 
-    # ---- Painel DIREITO — pista atual (branco) ----
-    right_lines = [
-        "DIRECTION NOW",
-        f"FO: {fo_pct:.2f}%",
-        f"RUMO: {int(heading_deg):03d}",
-        f"MAGNETIC DECLINATION: {declination:.1f}",
-        f"RUNWAY ORIENTATION: {headboard_runway(heading_deg)}",
-        f"CROSS WIND: {cross_now:.2f}%",
-    ]
-    rx  = rc.legend_x_right
-    ry0 = lspace * 2
-    for i, line in enumerate(right_lines):
-        cv.putText(img, line, (rx, ry0 + i * lspace),
-                   font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
-    
-    # ---- Legenda de cores (lado direito, posição fixa mais à direita) ----
-    legend_x_pos = rc.image_width - 280  # Posição fixa no canto direito
-    legend_y_start = ry0 + len(right_lines) * lspace + int(lspace * 1.5)
-    _draw_color_legend(img, config, legend_x_pos, legend_y_start)
-
-    # ---- Painel ESQUERDO — melhor pista (verde) — sempre visível ----
+    # ---- Painel ESQUERDO SUPERIOR — melhor pista (verde) ----
     lx  = rc.legend_x_left
     ly0 = lspace * 2
     left_lines = [
@@ -377,16 +358,39 @@ def _render_frame(
         cv.putText(img, line, (lx, ly0 + i * lspace),
                    font, fsize, (0, 255, 0), fthick, cv.LINE_AA)
 
-    # ---- Info do aeroporto (base) ----
-    lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
-    bottom_lines = [
-        f"Station: {station_name}  |  {years}-year window",
-        f"Lat: {lat_dms} {lat_dir}  /  Lon: {lon_dms} {lon_dir}",
+    # ---- Painel ESQUERDO MEIO — pista atual (branco) ----
+    # Posicionado abaixo do painel verde
+    ly_white = ly0 + len(left_lines) * lspace + int(lspace * 2)
+    white_lines = [
+        "DIRECTION NOW",
+        f"FO: {fo_pct:.2f}%",
+        f"RUMO: {int(heading_deg):03d}",
+        f"MAGNETIC DECLINATION: {declination:.1f}",
+        f"RUNWAY ORIENTATION: {headboard_runway(heading_deg)}",
+        f"CROSS WIND: {cross_now:.2f}%",
     ]
-    by0 = rc.image_height - lspace * (len(bottom_lines) + 1)
-    for i, line in enumerate(bottom_lines):
-        cv.putText(img, line, (lx, by0 + i * lspace),
+    for i, line in enumerate(white_lines):
+        cv.putText(img, line, (lx, ly_white + i * lspace),
+                   font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
+    
+    # ---- Info do aeroporto (lado DIREITO) ----
+    lat_dms, lat_dir, lon_dms, lon_dir = latlon_to_grau_minuto(lat, lon)
+    info_lines = [
+        f"Station: {station_name}",
+        f"{years}-year window",
+        f"Lat: {lat_dms} {lat_dir}",
+        f"Lon: {lon_dms} {lon_dir}",
+    ]
+    rx = rc.legend_x_right
+    ry0_info = lspace * 2
+    for i, line in enumerate(info_lines):
+        cv.putText(img, line, (rx, ry0_info + i * lspace),
                    font, fsize, (210, 210, 210), fthick, cv.LINE_AA)
+    
+    # ---- Legenda de cores (lado direito, abaixo da info) ----
+    legend_x_pos = rc.image_width - 280
+    legend_y_start = ry0_info + len(info_lines) * lspace + int(lspace * 1.5)
+    _draw_color_legend(img, config, legend_x_pos, legend_y_start)
 
     # ---- Salva frame (contorno para caminhos não-ASCII no Windows) ----
     os.makedirs(frames_folder, exist_ok=True)

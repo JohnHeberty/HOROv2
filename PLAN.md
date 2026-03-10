@@ -1,8 +1,45 @@
 # PLAN.md — Plano de Migração de Arquitetura: HOROv1 → Pipeline ETL
 
 > Elaborado em: 09/03/2026  
+> Última atualização: 10/03/2026  
 > Autor: GitHub Copilot  
 > Repositório: JohnHeberty/HOROv1
+
+---
+
+## ✅ MIGRAÇÃO CONCLUÍDA
+
+A migração para arquitetura medallion pipeline (Fases 1-4) foi concluída com sucesso.
+
+O pipeline está operacional com:
+- 7 estágios ETL (s01 → s07)
+- Arquitetura medallion (Raw → Bronze → Silver → Gold → Export)
+- Logging estruturado
+- Contratos de dados explícitos
+- Configuração centralizada
+- Orquestrador CLI
+
+### PENDENTE - Fase 5 (Validação e Limpeza)
+
+- [ ] Deletar `.trash/` após confirmar que pipeline funciona corretamente em todos os cenários
+- [ ] Implementar testes de integração ponta-a-ponta (`tests/`)
+- [ ] Adicionar testes unitários para serviços críticos
+- [ ] Documentar casos de uso avançados
+
+### Uso do Pipeline
+
+```bash
+# Executar pipeline completo
+python orchestrator.py --all
+
+# Forçar reprocessamento
+python orchestrator.py --all --force
+
+# Processar apenas uma estação
+python orchestrator.py --all --station BRASILIA
+```
+
+Para detalhes da metodologia de cálculo FO, consulte [UPDATE.md](UPDATE.md).
 
 ---
 
