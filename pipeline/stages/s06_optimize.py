@@ -479,25 +479,6 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     years=years,
                     n_frames=config.render.max_spin_deg + n_final_frames,
                 )
-                
-                # ---- Exporta imagem PNG da rosa dos ventos (melhor posição) ----
-                windrose_image_path = os.path.join(
-                    config.output.data_gold, "exports", station, f"Windrose-{years}y.png"
-                )
-                # Usa o último frame gerado (melhor posição)
-                last_frame_path = os.path.join(
-                    frames_folder, 
-                    f"{config.render.max_spin_deg + n_final_frames - 1:04d}.jpg"
-                )
-                if os.path.exists(last_frame_path):
-                    import shutil
-                    shutil.copy2(last_frame_path, windrose_image_path)
-                    log.info(
-                        "Imagem da rosa dos ventos exportada",
-                        station=station,
-                        years=years,
-                        path=windrose_image_path,
-                    )
 
             except Exception as exc:
                 log.error(

@@ -25,9 +25,10 @@ from pipeline.core.exceptions import ExportError
 from pipeline.core.logger import get_logger
 from pipeline.core.models import PipelineContext
 from pipeline.utils.video import create_gif, create_video
-from pipeline.utils.windrose_plot import create_windrose_plot
+from pipeline.utils.windrose_mpl import WindRosePlotter
 
 log = get_logger("s07_export")
+_windrose_plotter = WindRosePlotter()
 
 
 def _build_final_report(context: PipelineContext) -> Dict:
@@ -111,34 +112,25 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
 
             # --- Anemograma matplotlib ---
             try:
-                # Busca dados silver da estação
                 silver_df = context.silver.get(station)
-                if silver_df is not None and hasattr(silver_df, 'data'):
-                    windrose_path = os.path.join(station_dir, f"Windrose-{years}y.png")
-                    
-                    # Filtra dados pela janela temporal
+                if silver_df is not None and silver_df.df is not None:
                     from dateutil.relativedelta import relativedelta
-                    df_all = silver_df.data
+                    df_all = silver_df.df
                     max_date = df_all["timestamp"].max()
                     cutoff = max_date - relativedelta(years=years)
                     df_slice = df_all[df_all["timestamp"] >= cutoff].copy()
-                    
-                    # Aplica declinação magnética
-                    declination = context.declination.get(station, 0.0)
-                    df_slice["direction_mag"] = (df_slice["direction"] + declination) % 360
-                    
-                    create_windrose_plot(
+
+                    declination = silver_df.magnetic_declination or 0.0
+                    windrose_path = _windrose_plotter.plot_from_config(
                         df=df_slice,
-                        output_path=windrose_path,
-                        title=f"{station} - {years}-year Wind Rose",
-                        speed_bins=config.wind.limits_kts,
-                        width=10.0,
-                        height=10.0,
-                        dpi=150,
+                        station=station,
+                        years=years,
+                        output_dir=station_dir,
+                        declination=declination,
                     )
                     log.info("Anemograma gerado", station=station, years=years, path=windrose_path)
             except Exception as exc:
-                log.warning("Falha ao gerar anemograma matplotlib (não crítico)", station=station, error=str(exc))
+                log.warning("Falha ao gerar anemograma (não crítico)", station=station, error=str(exc))
 
     # --- Relatório consolidado ---
     if config.output.save_final_result:
