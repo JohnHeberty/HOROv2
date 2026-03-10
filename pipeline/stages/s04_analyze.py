@@ -33,7 +33,7 @@ def _calculate_year_windows(df: pd.DataFrame) -> List[int]:
     """
     Calcula automaticamente quais janelas de anos fazem sentido baseado nos dados disponíveis.
     
-    Retorna apenas janelas com pelo menos 80% de cobertura de dados.
+    Só gera análises para janelas onde há dados suficientes (mínimo 90% dos registros esperados).
     Por exemplo: se tem 6 anos de dados, retorna [5, 6] (não 10, 15, 20)
     """
     if df.empty or "timestamp" not in df.columns:
@@ -44,24 +44,29 @@ def _calculate_year_windows(df: pd.DataFrame) -> List[int]:
     max_date = df["timestamp"].max()
     min_date = df["timestamp"].min()
     
-    # Anos totais de dados disponíveis
-    total_years = relativedelta(max_date, min_date).years
+    # Anos totais de dados disponíveis (arredonda para cima)
+    delta = relativedelta(max_date, min_date)
+    total_years = delta.years + (1 if delta.months > 0 or delta.days > 0 else 0)
+    
     if total_years < 1:
         total_years = 1
     
     # Define janelas baseado nos dados reais
-    # Sempre inclui último ano completo
+    # Sempre inclui último ano completodo completo
     windows = [min(5, total_years)]  # Janela padrão de 5 anos ou total se menor
     
-    # Adiciona janelas de 10, 15, 20 anos apenas se tiver dados suficientes
+    # Adiciona janelas de 10, 15, 20 anos APENAS se tiver dados suficientes
+    # Critério: total_years >= window (100% de cobertura mínima)
     for window in [10, 15, 20]:
-        if total_years >= window * 0.8:  # 80% de cobertura mínima
+        if total_years >= window:
             windows.append(window)
     
     # Remove duplicatas e ordena
     windows = sorted(list(set(windows)))
     
-    log.debug(f"Anos de dados disponíveis: {total_years}, janelas calculadas: {windows}")
+    log.info(f"Dados disponíveis: {total_years} anos, janelas geradas: {windows}",
+            station="current", min_date=min_date.strftime("%Y-%m-%d"), 
+            max_date=max_date.strftime("%Y-%m-%d"))
     return windows
 
 
