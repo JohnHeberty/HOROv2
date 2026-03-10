@@ -497,13 +497,13 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     _best_h_gif: float  = 0.0
                     _best_fo_gif: float = 0.0
 
-                    for gif_idx in range(config.render.max_spin_deg * 2):
+                    for gif_idx in range(config.render.gif_spin_deg):
                         heading_gif = float(gif_idx)
-                        # fo_map cobre 0-179; para 180-359 usa o espelho (heading % 180)
+                        # fo_map cobre 0–179; para ângulos além disso usa o espelho
                         _key_int = int(heading_gif) % config.render.max_spin_deg
                         fo_gif   = fo_map.get(float(_key_int), fo_map.get(_key_int, 0.0))
 
-                        # Verde só é atualizado na primeira meia-volta
+                        # Verde só é atualizado na primeira meia-volta (0 até max_spin_deg)
                         if gif_idx < config.render.max_spin_deg and fo_gif > _best_fo_gif:
                             _best_fo_gif = fo_gif
                             _best_h_gif  = heading_gif
@@ -543,7 +543,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                             lon=lon,
                             declination=declination,
                             years=years,
-                            frame_idx=config.render.max_spin_deg * 2 + i,
+                            frame_idx=config.render.gif_spin_deg + i,
                             frames_folder=gif_frames_folder,
                             config=config,
                         )
@@ -552,7 +552,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                         "GIF frames gerados (360°)",
                         station=station,
                         years=years,
-                        n_frames=config.render.max_spin_deg * 2 + n_final_frames,
+                        n_frames=config.render.gif_spin_deg + n_final_frames,
                     )
                 except Exception as exc_gif:
                     log.warning(

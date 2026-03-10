@@ -76,27 +76,26 @@ class WindRosePlotter:
 
     def __init__(self, config_path: Optional[str] = None) -> None:
         cfg = _load_config(config_path)
+        _rosa  = cfg.get("rosa_dos_ventos", {})
+        _pista = cfg.get("pista", {})
 
-        # Bandas de velocidade configuráveis
-        self.bands: List[float] = cfg.get("wind_speed_bands_kts", [3, 13, 20, 25, 40])
+        # Bandas de velocidade — lidas de rosa_dos_ventos.wind_speed_bands_kts
+        self.bands: List[float] = _rosa.get("wind_speed_bands_kts", [3, 13, 20, 25, 40])
 
-        # Comprimento de pista e limite de crosswind — sempre via RBAC154:
-        #   >= 1500 m → 20 kt | 1200–1500 m → 13 kt | < 1200 m → 10 kt
-        self.runway_length_m: float = float(cfg.get("runway_length_m", 1500))
+        # Comprimento de pista e limite de crosswind — sempre via RBAC154
+        self.runway_length_m: float = float(_pista.get("runway_length_m", 1500))
         self.crosswind_limit: float = _crosswind_limit(self.runway_length_m)
 
         # Número de setores (sempre 16 conforme RBAC154)
         self.n_sectors: int = 16
 
-        # Paleta de cores — carregada de windrose_band_colors_rgb se disponível
-        if "windrose_band_colors_rgb" in cfg:
-            raw = cfg["windrose_band_colors_rgb"]
-            if isinstance(raw, list) and len(raw) >= 6:
-                self.band_colors: List[Tuple[float, float, float]] = [
-                    (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in raw
-                ]
-            else:
-                self.band_colors = list(_BAND_COLORS_RGB_DEFAULT)
+        # Paleta de cores — lida de rosa_dos_ventos.cores_rgb no config_runway.json
+        _rosa = cfg.get("rosa_dos_ventos", {})
+        raw = _rosa.get("cores_rgb")
+        if isinstance(raw, list) and len(raw) >= 6:
+            self.band_colors: List[Tuple[float, float, float]] = [
+                (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in raw
+            ]
         else:
             self.band_colors = list(_BAND_COLORS_RGB_DEFAULT)
 

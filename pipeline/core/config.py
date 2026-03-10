@@ -135,7 +135,8 @@ class RenderConfig:
     legend_x_right: int = field(init=False)
     legend_x_left: int = 40
     legend_y_spacing: int = 40
-    max_spin_deg: int = 180
+    max_spin_deg: int = 180   # graus de rotação do vídeo MP4
+    gif_spin_deg: int  = 360   # graus de rotação do GIF (separado)
 
     # Paleta de cores do vídeo (BGR, OpenCV) — carregada de config_runway.json
     # Índices 0–5 = bandas de velocidade.
@@ -236,54 +237,70 @@ class PipelineConfig:
     def load_runway_config(self) -> None:
         """Carrega configuração de pista do arquivo config_runway.json se existir."""
         config_path = os.path.join(_REPO_ROOT, "config_runway.json")
-        if os.path.exists(config_path):
-            try:
-                import json
-                with open(config_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    self.wind.runway_length_m = float(data.get("runway_length_m", 1500))
+        if not os.path.exists(config_path):
+            return
+        try:
+            import json
+            with open(config_path, "r", encoding="utf-8") as f:
+                d = json.load(f)
 
-                    # Limite de crosswind — sempre calculado pela regra RBAC154
-                    # conforme comprimento de pista (runway_length_m):
-                    #   >= 1500 m → 20 kt | 1200–1500 m → 13 kt | < 1200 m → 10 kt
-                    rl = self.wind.runway_length_m
-                    self.wind.crosswind_limit_kts = (
-                        20.0 if rl >= 1500 else 13.0 if rl >= 1200 else 10.0
-                    )
+            # ----------------------------------------------------------------
+            # Pista (nested: d["pista"][...])
+            # ----------------------------------------------------------------
+            pista = d.get("pista", {})
+            self.wind.runway_length_m = float(pista.get("runway_length_m", self.wind.runway_length_m))
+            rl = self.wind.runway_length_m
+            self.wind.crosswind_limit_kts = (
+                20.0 if rl >= 1500 else 13.0 if rl >= 1200 else 10.0
+            )
 
-                    # Carrega limites de velocidade personalizados
-                    if "wind_speed_bands_kts" in data:
-                        limits = data["wind_speed_bands_kts"]
-                        if isinstance(limits, list) and len(limits) >= 3:
-                            self.wind.limits_kts = limits
+            # ----------------------------------------------------------------
+            # Rosa dos ventos (nested: d["rosa_dos_ventos"][...])
+            # ----------------------------------------------------------------
+            rosa = d.get("rosa_dos_ventos", {})
+            _bands = rosa.get("wind_speed_bands_kts")
+            if isinstance(_bands, list) and len(_bands) >= 3:
+                self.wind.limits_kts = _bands
+            _cores_rosa = rosa.get("cores_rgb")
+            if isinstance(_cores_rosa, list) and len(_cores_rosa) >= 6:
+                self.wind.windrose_band_colors_rgb = [
+                    (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in _cores_rosa
+                ]
 
-                    # Overrides opcionais de coordenadas
-                    if data.get("latitude") is not None:
-                        self.wind.latitude_override = float(data["latitude"])
-                    if data.get("longitude") is not None:
-                        self.wind.longitude_override = float(data["longitude"])
+            # ----------------------------------------------------------------
+            # Vídeo (nested: d["video"][...])
+            # ----------------------------------------------------------------
+            video = d.get("video", {})
+            _vspin = video.get("video_spin_deg")
+            if isinstance(_vspin, int) and _vspin > 0:
+                self.render.max_spin_deg = _vspin
+            _gspin = video.get("gif_spin_deg")
+            if isinstance(_gspin, int) and _gspin > 0:
+                self.render.gif_spin_deg = _gspin
+            _cores_video = video.get("cores_rgb")
+            if isinstance(_cores_video, list) and len(_cores_video) >= 6:
+                self.render.video_band_colors_bgr = [
+                    (int(c[2]), int(c[1]), int(c[0])) for c in _cores_video
+                ]
 
-                    # Override de declinação magnética — pula NOAA quando definido
-                    if data.get("magnetic_declination") is not None:
-                        self.wind.magnetic_declination_override = float(data["magnetic_declination"])
+            # ----------------------------------------------------------------
+            # Localização (nested: d["localizacao"][...])
+            # ----------------------------------------------------------------
+            loc = d.get("localizacao", {})
+            if loc.get("latitude") is not None:
+                self.wind.latitude_override = float(loc["latitude"])
+            if loc.get("longitude") is not None:
+                self.wind.longitude_override = float(loc["longitude"])
 
-                    # Cores do vídeo: JSON armazena [R,G,B] 0-255 → converte para BGR (OpenCV)
-                    if "video_band_colors_rgb" in data:
-                        raw = data["video_band_colors_rgb"]
-                        if isinstance(raw, list) and len(raw) >= 6:
-                            self.render.video_band_colors_bgr = [
-                                (int(c[2]), int(c[1]), int(c[0])) for c in raw
-                            ]
+            # ----------------------------------------------------------------
+            # Declinação magnética (nested: d["declinacao_magnetica"]["valor"])
+            # ----------------------------------------------------------------
+            decl = d.get("declinacao_magnetica", {})
+            if decl.get("valor") is not None:
+                self.wind.magnetic_declination_override = float(decl["valor"])
 
-                    # Cores da rosa PNG: JSON armazena [R,G,B] 0-255 → converte para float 0-1 (matplotlib)
-                    if "windrose_band_colors_rgb" in data:
-                        raw = data["windrose_band_colors_rgb"]
-                        if isinstance(raw, list) and len(raw) >= 6:
-                            self.wind.windrose_band_colors_rgb = [
-                                (c[0] / 255.0, c[1] / 255.0, c[2] / 255.0) for c in raw
-                            ]
-            except Exception:
-                pass  # Se falhar, mantém o valor padrão
+        except Exception:
+            pass  # Se falhar, mantém os valores padrão
 
 
 # Instância global — reutilize em todo o pipeline

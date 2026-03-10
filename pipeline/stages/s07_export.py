@@ -108,7 +108,7 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     # Verifica se gif_frames tem frames suficientes para 360°
                     from glob import glob as _glob
                     _gif_jpg_count = len(_glob(os.path.join(gif_frames_folder, "*.jpg")))
-                    _min_gif_frames = config.render.max_spin_deg * 2  # 360
+                    _min_gif_frames = config.render.gif_spin_deg  # e.g. 360
 
                     if os.path.isdir(gif_frames_folder) and _gif_jpg_count >= _min_gif_frames:
                         # Constrói vídeo temporário a partir dos frames 360° e converte para GIF
