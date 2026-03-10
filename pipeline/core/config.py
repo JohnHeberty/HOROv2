@@ -114,7 +114,7 @@ class RenderConfig:
     fps_video: int = 10
     wind_rose_proportion: float = 0.18  # Raio da rosa (0.18 para visualização compacta)
     background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro da imagem (BGR)
-    windrose_background: tuple = (70, 70, 70)  # Fundo cinza claro da rosa dos ventos (BGR)
+    windrose_background: tuple = (90, 90, 90)  # Fundo cinza claro da rosa dos ventos (BGR)
     color_runway: tuple = (255, 255, 255)
     color_best_runway: tuple = (0, 255, 0)
     color_point_ref: tuple = (255, 165, 0)

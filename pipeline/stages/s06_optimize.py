@@ -150,23 +150,23 @@ def _build_base_image(
             color = tuple(min(255, int(c * brightness)) for c in base_bgr)
             image[cell_mask] = color
 
-    # ---- Bordas dos círculos concêntricos ----
+    # ---- Bordas dos círculos concêntricos (branco) ----
     for i, limit in enumerate(limits):
         r = int(W * limit * proporcao)
         if limit == wc.crosswind_limit_kts:
             # Limite de vento cruzado: linha tracejada mais visível
-            cv.circle(image, center, r, (120, 120, 255), 3)
+            cv.circle(image, center, r, (255, 255, 255), 3)
         else:
-            cv.circle(image, center, r, (100, 80, 60), 2)
+            cv.circle(image, center, r, (255, 255, 255), 2)
 
-    cv.circle(image, center, comprimento, (200, 200, 200), 3)   # borda externa mais grossa
+    cv.circle(image, center, comprimento, (255, 255, 255), 3)   # borda externa mais grossa
 
-    # ---- Divisores de setor (linhas radiais mais visíveis) ----
+    # ---- Divisores de setor (linhas radiais brancas) ----
     for _s_name, (s_start, _s_end) in setores.items():
         rad = np.radians(-s_start - 180)
         p2  = (int(cx + comprimento * np.sin(rad)),
                int(cy + comprimento * np.cos(rad)))
-        cv.line(image, center, p2, (80, 80, 80), 2)
+        cv.line(image, center, p2, (255, 255, 255), 2)
 
     # ---- Labels cardeais e colaterais (N, NE, E, SE, S, SW, W, NW) ----
     cardinal = {
@@ -479,6 +479,25 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     years=years,
                     n_frames=config.render.max_spin_deg + n_final_frames,
                 )
+                
+                # ---- Exporta imagem PNG da rosa dos ventos (melhor posição) ----
+                windrose_image_path = os.path.join(
+                    config.output.data_gold, "exports", station, f"Windrose-{years}y.png"
+                )
+                # Usa o último frame gerado (melhor posição)
+                last_frame_path = os.path.join(
+                    frames_folder, 
+                    f"{config.render.max_spin_deg + n_final_frames - 1:04d}.jpg"
+                )
+                if os.path.exists(last_frame_path):
+                    import shutil
+                    shutil.copy2(last_frame_path, windrose_image_path)
+                    log.info(
+                        "Imagem da rosa dos ventos exportada",
+                        station=station,
+                        years=years,
+                        path=windrose_image_path,
+                    )
 
             except Exception as exc:
                 log.error(
