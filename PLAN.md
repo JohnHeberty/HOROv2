@@ -326,36 +326,8 @@ Cada Parquet salvo inclui metadados nas colunas extras ou no sidecar JSON:
 
 ## 8. ROTEIRO DE MIGRAÇÃO (FASES)
 
-### Fase 1 — Infraestrutura (CONCLUÍDA NESTE COMMIT)
-- [x] Criar `PLAN.md`
-- [x] Criar estrutura de pastas
-- [x] `pipeline/core/config.py` — todas as settings
-- [x] `pipeline/core/logger.py` — logging estruturado
-- [x] `pipeline/core/exceptions.py` — hierarquia de erros
-- [x] `pipeline/core/models.py` — contratos de dados
-- [x] `pipeline/utils/encoding.py` — detecção de encoding
-- [x] Criar `data/raw/`, `data/bronze/`, `data/silver/`, `data/gold/`
-
-### Fase 2 — Serviços e Utilitários (CONCLUÍDA NESTE COMMIT)
-- [x] `pipeline/services/browser.py`
-- [x] `pipeline/services/drawing.py`
-- [x] `pipeline/services/wind.py`
-- [x] `pipeline/services/runway.py`
-- [x] `pipeline/utils/geo.py`
-- [x] `pipeline/utils/video.py`
-
-### Fase 3 — Estágios ETL (CONCLUÍDA NESTE COMMIT)
-- [x] `pipeline/stages/s01_ingest.py`
-- [x] `pipeline/stages/s02_validate.py`
-- [x] `pipeline/stages/s03_transform.py`
-- [x] `pipeline/stages/s04_analyze.py`
-- [x] `pipeline/stages/s05_enrich.py`
-- [x] `pipeline/stages/s06_optimize.py`
-- [x] `pipeline/stages/s07_export.py`
-
-### Fase 4 — Orquestração (CONCLUÍDA NESTE COMMIT)
-- [x] `orchestrator.py` — CLI com argparse
-- [x] `run_pipeline.ipynb` — notebook simplificado
+### Fase 1-4 — Infraestrutura, Serviços, ETL e Orquestração ✅
+Todas as fases foram concluídas e o pipeline está operacional.
 
 ### Fase 5 — Validação e Limpeza (PENDENTE)
 - [ ] Copiar CSVs de `1-INPUT/` para `data/raw/` e validar ponta-a-ponta

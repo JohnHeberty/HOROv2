@@ -176,6 +176,71 @@ def _build_base_image(
 
 
 # ---------------------------------------------------------------------------
+# Utilitário: legenda de cores (bandas de velocidade)
+# ---------------------------------------------------------------------------
+def _draw_color_legend(
+    image: np.ndarray,
+    config: PipelineConfig,
+    start_x: int,
+    start_y: int,
+) -> None:
+    """
+    Desenha uma legenda de cores mostrando as bandas de velocidade do vento.
+    Cada banda é representada por um retângulo colorido + label.
+    
+    Args:
+        image: Imagem onde desenhar
+        config: Configuração do pipeline
+        start_x: Coordenada X inicial (canto superior esquerdo)
+        start_y: Coordenada Y inicial
+    """
+    rc = config.render
+    wc = config.wind
+    
+    # Dimensões de cada retângulo de cor
+    box_width = 40
+    box_height = 25
+    text_offset_x = box_width + 10
+    line_spacing = box_height + 8
+    
+    # Monta as labels das bandas
+    limits = wc.limits_kts
+    band_labels = [
+        f"[0-{limits[0]:.0f} kt]",
+        f"[{limits[0]:.0f}-{limits[1]:.0f} kt]",
+        f"[{limits[1]:.0f}-{limits[2]:.0f} kt]",
+        f"[{limits[2]:.0f}-{limits[3]:.0f} kt]",
+        f"[{limits[3]:.0f}-{limits[4]:.0f} kt]",
+        f"[{limits[4]:.0f}+ kt]",
+    ]
+    
+    # Título da legenda
+    cv.putText(image, "Wind Speed:", (start_x, start_y - 10),
+               rc.font, 0.7, (255, 255, 255), 2, cv.LINE_AA)
+    
+    # Desenha cada banda
+    for i, (color_bgr, label) in enumerate(zip(rc.video_band_colors_bgr, band_labels)):
+        y_pos = start_y + i * line_spacing
+        
+        # Retângulo colorido
+        cv.rectangle(image, 
+                    (start_x, y_pos),
+                    (start_x + box_width, y_pos + box_height),
+                    color_bgr, -1)  # -1 = preenchido
+        
+        # Borda branca
+        cv.rectangle(image,
+                    (start_x, y_pos),
+                    (start_x + box_width, y_pos + box_height),
+                    (255, 255, 255), 2)
+        
+        # Label da banda
+        cv.putText(image, label,
+                  (start_x + text_offset_x, y_pos + box_height - 5),
+                  rc.font, 0.6, (255, 255, 255), 1, cv.LINE_AA)
+
+
+# ---------------------------------------------------------------------------
 # Utilitário: retângulo de pista rotacionado
 # ---------------------------------------------------------------------------
 def _draw_runway_rect(
@@ -291,6 +356,10 @@ def _render_frame(
     for i, line in enumerate(right_lines):
         cv.putText(img, line, (rx, ry0 + i * lspace),
                    font, fsize, (255, 255, 255), fthick, cv.LINE_AA)
+    
+    # ---- Legenda de cores (abaixo do painel direito) ----
+    legend_y_start = ry0 + len(right_lines) * lspace + lspace
+    _draw_color_legend(img, config, rx, legend_y_start)
 
     # ---- Painel ESQUERDO — melhor pista (verde) — sempre visível ----
     lx  = rc.legend_x_left

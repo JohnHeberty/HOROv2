@@ -1,43 +1,25 @@
 # UPGRADE.md — Análise de Erros e Melhorias do HOROv1
 
 > Documento gerado em: 09/03/2026  
-> Última atualização: 09/03/2026  
+> Última atualização: 10/03/2026  
 > Autor da análise: GitHub Copilot  
 > Repositório: JohnHeberty/HOROv1
 
 ---
 
-## STATUS DE IMPLEMENTAÇÃO
+## ✅ TODAS AS MELHORIAS FORAM IMPLEMENTADAS
 
-| ID | Descrição | Arquivo | Status |
-|----|-----------|---------|--------|
-| ERR-01 | Auto-importação circular removida | `Functions.py` | ✅ Implementado |
-| ERR-02 | `numpy==1.26.4` corrigido | `requirements.txt` | ✅ Implementado |
-| ERR-03 | Vírgula ausente em `format_dates` | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| ERR-04 | `self.Driver` → `self.driver` | `Modulos/BROWSER/Engine.py` | ✅ Implementado |
-| ERR-05 | `eval()` → `float()` em coordenadas | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| ERR-06 | Aviso explícito sobre `DataFilesAuto_FILTRO` | `RUN_HORO.ipynb` | ✅ Implementado |
-| ERR-07 | `if/elif` idênticos removidos (3 funções) | `Functions.py` | ✅ Implementado |
-| ERR-08 | `"Frota"` → `"Fora"` | `RUN_HORO.ipynb` | ✅ Implementado |
-| ERR-09 | Lógica de melhor orientação corrigida | `RUN_HORO.ipynb` | ✅ Implementado |
-| ERR-10 | `HeadboardRunway` reescrita com aritmética | `Functions.py` | ✅ Implementado |
-| ERR-11 | Parâmetro `keep_calms` exposto | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| ERR-12 | `timedelta` → `relativedelta` (anos bissextos) | `RUN_HORO.ipynb` | ✅ Implementado |
-| WARN-01 | `executable_path` depreciado removido | `Modulos/BROWSER/Engine.py` | ✅ Implementado |
-| WARN-02 | API moviepy compatível 1.x e 2.x | `RUN_HORO.ipynb` | ✅ Implementado |
-| WARN-03 | `SaveFinalEsult` → `SaveFinalResult` | `Default.py` + `RUN_HORO.ipynb` | ✅ Implementado |
-| M-01 | Funções duplicadas removidas de `Functions.py` | `Functions.py` | ✅ Implementado |
-| M-02 | `save_analysis` exposto como parâmetro | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| M-03 | Suporte a macOS adicionado | `Modulos/BROWSER/Engine.py` | ✅ Implementado |
-| M-04 | `GetMagneticDeclination` lança erro se falhar | `Functions.py` | ✅ Implementado |
-| M-05 | Caminhos absolutos com `__file__` | `Default.py` | ✅ Implementado |
-| M-06 | Célula pip substituída por `-r requirements.txt` | `RUN_HORO.ipynb` | ✅ Implementado |
-| M-07 | Importações duplicadas removidas | `RUN_HORO.ipynb` | ✅ Implementado |
-| M-08 | `ClearFolder` usa `shutil.rmtree` | `Functions.py` | ✅ Implementado |
-| M-09 | `MAGNETUDE` → `MAGNITUDE` (grafia correta) | `Modulos/SITRAER/Script1.py` | ✅ Implementado |
-| M-10 | `pd.to_numeric` para valores inválidos de vento | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| **Encoding** | Auto-detecção + cadeia de 7 fallbacks | `Modulos/DADOS/Engine.py` | ✅ Implementado |
-| **Encoding** | `chardet` + `python-dateutil` adicionados | `requirements.txt` | ✅ Implementado |
+Todos os 31 itens identificados (erros críticos, erros de lógica, avisos e melhorias) foram corrigidos e migrados para a nova arquitetura medallion pipeline.
+
+O código legado foi movido para `.trash/` e substituído por:
+- Pipeline modular (s01 → s07)
+- Contratos de dados explícitos
+- Logging estruturado
+- Separação de responsabilidades
+- Configuração centralizada
+
+Para detalhes da arquitetura atual, consulte [PLAN.md](PLAN.md).  
+Para metodologia de cálculo FO, consulte [UPDATE.md](UPDATE.md).
 
 ---
 

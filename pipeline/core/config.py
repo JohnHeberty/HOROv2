@@ -124,7 +124,7 @@ class RenderConfig:
     font_thickness: int = 1
     gif_speed_multiplier: int = 4
     fps_video: int = 10
-    wind_rose_proportion: float = 0.18  # Raio da rosa (0.18 para visualização compacta)
+    wind_rose_proportion: float = 0.207  # Raio da rosa (aumentado 15% para melhor visualização)
     background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro da imagem (BGR)
     windrose_background: tuple = (90, 90, 90)  # Fundo cinza claro da rosa dos ventos (BGR)
     color_runway: tuple = (255, 255, 255)

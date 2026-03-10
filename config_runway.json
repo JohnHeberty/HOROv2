@@ -46,6 +46,6 @@
 
   "declinacao_magnetica": {
     "_note": "Opcional. Se 'valor' for informado (graus; positivo=Leste, negativo=Oeste), a consulta a NOAA e ignorada. Use null para calcular automaticamente.",
-    "valor": null
+    "valor": -21.5
   }
 }
