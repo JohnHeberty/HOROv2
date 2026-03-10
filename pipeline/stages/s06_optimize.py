@@ -142,7 +142,8 @@ def _build_base_image(
             if pct <= 0.0:
                 continue
 
-            brightness = max(0.15, (pct / max_pct) ** 0.5)
+            # Cores mais saturadas e visíveis (mínimo 30%, máximo 95%)
+            brightness = 0.30 + 0.65 * (pct / max_pct)
             color = tuple(min(255, int(c * brightness)) for c in base_bgr)
             image[cell_mask] = color
 
@@ -151,29 +152,29 @@ def _build_base_image(
         r = int(W * limit * proporcao)
         if limit == wc.crosswind_limit_kts:
             # Limite de vento cruzado: linha tracejada mais visível
-            cv.circle(image, center, r, (100, 100, 230), 2)
+            cv.circle(image, center, r, (120, 120, 255), 3)
         else:
-            cv.circle(image, center, r, (80, 60, 40), 1)
+            cv.circle(image, center, r, (100, 80, 60), 2)
 
-    cv.circle(image, center, comprimento, (180, 180, 180), 2)   # borda externa
+    cv.circle(image, center, comprimento, (200, 200, 200), 3)   # borda externa mais grossa
 
-    # ---- Divisores de setor (linhas radiais finas) ----
+    # ---- Divisores de setor (linhas radiais mais visíveis) ----
     for _s_name, (s_start, _s_end) in setores.items():
         rad = np.radians(-s_start - 180)
         p2  = (int(cx + comprimento * np.sin(rad)),
                int(cy + comprimento * np.cos(rad)))
-        cv.line(image, center, p2, (50, 50, 50), 1)
+        cv.line(image, center, p2, (80, 80, 80), 2)
 
     # ---- Labels cardeais ----
     cardinal = {0: "N", 90: "E", 180: "S", 270: "W"}
     for angle_deg, label in cardinal.items():
         rad    = np.radians(-angle_deg - 180)
-        offset = comprimento + 22
+        offset = comprimento + 35
         px     = int(cx + offset * np.sin(rad))
         py     = int(cy + offset * np.cos(rad))
-        (tw, th), _ = cv.getTextSize(label, rc.font, 0.7, 1)
+        (tw, th), _ = cv.getTextSize(label, rc.font, 1.0, 2)
         cv.putText(image, label, (px - tw // 2, py + th // 2),
-                   rc.font, 0.7, (230, 230, 230), 1, cv.LINE_AA)
+                   rc.font, 1.0, (240, 240, 240), 2, cv.LINE_AA)
 
     return image, comprimento, crosswind_r, center
 
