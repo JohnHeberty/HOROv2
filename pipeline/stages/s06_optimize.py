@@ -235,25 +235,18 @@ def _render_frame(
     rc  = config.render
     img = base_image.copy()
 
-    # ---- Helper: retorna o ângulo do extremo que aponta para o Norte (parte superior da tela) ----
-    def _north_h(h: float) -> float:
-        """De um par de cabeceiras, retorna a que fica no semi-plano norte (y < cy)."""
-        h_n = h % 360.0
-        return h_n if (h_n <= 90.0 or h_n >= 270.0) else (h_n + 180.0) % 360.0
-
     # ---- Retângulo da MELHOR pista (verde) — na melhor posição encontrada até agora ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       best_heading, rc.color_best_runway, 2)
-    # Bolinha apenas no extremo norte da pista verde
-    best_north_h = _north_h(best_heading)
-    draw_reference_point(img, center, comprimento, best_north_h,
+    # Bolinha num único extremo da pista verde (em best_heading — extremo "ativo" da orientação)
+    draw_reference_point(img, center, comprimento, best_heading,
                          (0, 210, 0), rc.point_ref_size)
 
-    # ---- Numeração de pista (verde) próxima à bolinha norte ----
+    # ---- Numeração de pista (verde) próxima à bolinha ----
     cx, cy = center
     rwy_text = headboard_runway(best_heading).replace("-", "/")
     rwy_label = f"RWY {rwy_text}"
-    _rad_rwy = np.radians(-best_north_h - 180)
+    _rad_rwy = np.radians(-best_heading - 180)
     _offs = comprimento + 55
     _tx = int(cx + _offs * np.sin(_rad_rwy))
     _ty = int(cy + _offs * np.cos(_rad_rwy))
@@ -264,8 +257,8 @@ def _render_frame(
     # ---- Retângulo da pista ATUAL (branco, mais grosso) ----
     _draw_runway_rect(img, center, crosswind_r, comprimento,
                       heading_deg, rc.color_runway, 3)
-    # Bolinha apenas no extremo norte da pista branca (sem texto)
-    draw_reference_point(img, center, comprimento, _north_h(heading_deg),
+    # Bolinha num único extremo da pista branca — em heading_deg, percorre 360° sem resetar
+    draw_reference_point(img, center, comprimento, heading_deg,
                          rc.color_point_ref, rc.point_ref_size)
 
     # ---- Parâmetros de texto ----
