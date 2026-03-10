@@ -266,17 +266,17 @@ def _render_frame(
     fsize  = rc.font_size
     fthick = rc.font_thickness
     lspace = rc.legend_y_spacing
-    cross_now  = round(100.0 - fo_pct,  1)
-    cross_best = round(100.0 - best_fo, 1)
+    cross_now  = round(100.0 - fo_pct,  2)
+    cross_best = round(100.0 - best_fo, 2)
 
     # ---- Painel DIREITO — pista atual (branco) ----
     right_lines = [
         "DIRECTION NOW",
-        f"FO: {fo_pct:.1f}%",
+        f"FO: {fo_pct:.2f}%",
         f"RUMO: {int(heading_deg):03d}",
         f"MAGNETIC DECLINATION: {declination:.1f}",
         f"RUNWAY ORIENTATION: {headboard_runway(heading_deg)}",
-        f"CROSS WIND: {cross_now:.1f}%",
+        f"CROSS WIND: {cross_now:.2f}%",
     ]
     rx  = rc.legend_x_right
     ry0 = lspace * 2
@@ -287,11 +287,11 @@ def _render_frame(
     # ---- Painel ESQUERDO — melhor pista (verde) ----
     left_lines = [
         "BEST DIRECTION",
-        f"FO: {best_fo:.1f}%",
+        f"FO: {best_fo:.2f}%",
         f"RUMO: {int(best_heading):03d}",
         f"MAGNETIC DECLINATION: {declination:.1f}",
         f"RUNWAY ORIENTATION: {headboard_runway(best_heading)}",
-        f"CROSS WIND: {cross_best:.1f}%",
+        f"CROSS WIND: {cross_best:.2f}%",
     ]
     lx  = rc.legend_x_left
     ly0 = lspace * 2
@@ -419,25 +419,18 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                 base_image, comprimento, crosswind_r, rose_center = \
                     _build_base_image(df_slice, config)
 
-                # ---- Gera frames 0–179°, acumulando melhor ângulo progressivamente ----
-                best_h_so_far:  float = 0.0
-                best_fo_so_far: float = 0.0
-
+                # ---- Gera frames 0–179°, pista verde FIXA no melhor rumo global ----
                 for frame_idx in range(config.render.max_spin_deg):
                     heading = float(frame_idx)
-                    fo_now  = fo_map.get(heading, 0.0)
-
-                    if fo_now > best_fo_so_far:
-                        best_fo_so_far = fo_now
-                        best_h_so_far  = heading
+                    fo_now  = fo_map.get(heading, fo_map.get(int(heading), 0.0))
 
                     _render_frame(
                         base_image=base_image,
                         comprimento=comprimento,
                         crosswind_r=crosswind_r,
                         center=rose_center,
-                        best_heading=best_h_so_far,
-                        best_fo=best_fo_so_far,
+                        best_heading=best_heading_final,  # fixo desde o frame 0
+                        best_fo=fo_best,                  # fixo desde o frame 0
                         heading_deg=heading,
                         fo_pct=fo_now,
                         station_name=station,
