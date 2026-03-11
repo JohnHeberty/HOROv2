@@ -4,11 +4,12 @@ matplotlib
 scikit-learn
 opencv-python
 moviepy
-selenium
-webdriver-manager
+geomag
 Unidecode
 chardet
 python-dateutil
 pyarrow
 fastparquet
+structlog
+pillow
 numpy==1.26.4

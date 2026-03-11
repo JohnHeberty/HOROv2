@@ -4,8 +4,8 @@ pipeline/stages/s05_enrich.py
 Stage 5 — ENRICH: Silver → Silver (Declinação magnética)
 
 Responsabilidades:
-  - Consulta a NOAA para cada estação via Selenium
-  - Usa cache local (data/silver/declinations.json) para evitar requisições repetidas
+  - Calcula a declinação magnética localmente via modelo WMM (pacote geomag)
+  - Usa cache local (data/silver/declinations.json) para evitar recálculos
   - Aplica declinação magnética ao SilverRecord
 
 Entrada:  context.silver
@@ -40,39 +40,18 @@ def _save_cache(cache_path: str, data: Dict[str, float]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _fetch_declination(lat: float, lon: float, timeout: int = 30) -> float:
+def _fetch_declination(lat: float, lon: float) -> float:
     """
-    Consulta a NOAA via API HTTP para obter a declinação magnética.
+    Calcula a declinação magnética localmente via modelo WMM (pacote geomag).
 
-    Endpoint: https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination
-    Sem browser — usa apenas urllib (stdlib). Retorna graus decimais:
+    Sem internet, sem API key. Retorna graus decimais:
       positivo = Leste, negativo = Oeste.
     """
-    import json
-    import urllib.parse
-    import urllib.request
-    from datetime import date
+    import geomag
 
-    today = date.today()
-    params = urllib.parse.urlencode({
-        "lat1":        lat,
-        "lon1":        lon,
-        "model":       "WMM",
-        "startYear":   today.year,
-        "startMonth":  today.month,
-        "startDay":    today.day,
-        "resultFormat": "json",
-    })
-    url = f"https://www.ngdc.noaa.gov/geomag-web/calculators/calculateDeclination?{params}"
-    log.debug("Requisição NOAA API", url=url)
-
-    req = urllib.request.Request(url, headers={"User-Agent": "HOROv2/1.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        data = json.loads(resp.read().decode())
-
-    declination = float(data["result"][0]["declination"])
-    log.debug("NOAA API respondeu", raw_declination=declination)
-    return declination
+    declination = geomag.declination(lat, lon)
+    log.debug("Declinação calculada localmente (WMM)", lat=lat, lon=lon, declination=declination)
+    return float(declination)
 
 
 # ---------------------------------------------------------------------------
@@ -144,19 +123,19 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
     if not need_fetch:
         log.info("Todas as declinações já estão em cache")
     else:
-        log.info("Consultando NOAA via API HTTP", stations=len(need_fetch))
+        log.info("Calculando declinação magnética (WMM local)", stations=len(need_fetch))
         for station, record in need_fetch:
             lat = record.metadata.latitude
             lon = record.metadata.longitude
-            log.info("Consultando NOAA", station=station, lat=lat, lon=lon)
+            log.info("Calculando (WMM)", station=station, lat=lat, lon=lon)
             try:
-                dec = _fetch_declination(lat, lon, timeout=30)
+                dec = _fetch_declination(lat, lon)
                 cache[station] = dec
                 updated = True
-                log.info("Declinação obtida", station=station, declination=dec)
+                log.info("Declinação calculada", station=station, declination=dec)
             except Exception as exc:
                 log.warning(
-                    "API NOAA falhou — usando declinação 0.0 (fallback neutro)",
+                    "Cálculo de declinação falhou — usando 0.0 (fallback neutro)",
                     station=station,
                     error=str(exc),
                 )
