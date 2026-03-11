@@ -111,12 +111,14 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     _min_gif_frames = config.render.gif_spin_deg  # e.g. 360
 
                     if os.path.isdir(gif_frames_folder) and _gif_jpg_count >= _min_gif_frames:
-                        # Cria GIF diretamente dos frames JPG com Pillow (sem MoviePy)
+                        # Frames 360° → MP4 temp → ffmpeg palette GIF
                         create_gif_from_frames(
                             frames_folder=gif_frames_folder,
                             output_gif=gif_path,
                             fps=rc.fps_video,
                             speed_multiplier=rc.gif_speed_multiplier,
+                            width=rc.image_width,
+                            height=rc.image_height,
                         )
                         log.info("GIF 360° gerado", station=station, years=years,
                                  frames=_gif_jpg_count, path=gif_path)

@@ -81,140 +81,130 @@ def create_video(
     return output_path
 
 
-def create_gif_from_frames(
-    frames_folder: str,
-    output_gif: str,
-    fps: int = 10,
-    speed_multiplier: int = 4,
-    max_width: int = 1920,
-) -> str:
-    """
-    Cria GIF animado diretamente de frames JPG usando Pillow.
-
-    Evita MoviePy e seus problemas de crash no Fortran runtime (forrtl error 200).
-
-    Args:
-        frames_folder:      Pasta com frames .jpg (ordenados numericamente).
-        output_gif:         Caminho de saída do .gif.
-        fps:                Frames por segundo do vídeo original.
-        speed_multiplier:   Aceleração do GIF (ex.: 4 = 4× mais rápido).
-        max_width:          Largura máxima para redimensionar os frames.
-
-    Returns:
-        Caminho absoluto do GIF gerado.
-    """
-    from PIL import Image  # type: ignore
-
-    jpg_files = sorted(
-        glob(os.path.join(frames_folder, "*.jpg")),
-        key=lambda x: int("".join(c for c in os.path.basename(x) if c.isdigit()) or "0"),
-    )
-    if not jpg_files:
-        raise FileNotFoundError(f"Nenhum frame .jpg encontrado em: {frames_folder}")
-
-    duration_ms = max(20, int(1000 / (fps * speed_multiplier)))
-
-    pil_frames: list = []
-    for path in jpg_files:
-        try:
-            img = Image.open(path).convert("RGB")
-        except Exception as exc:
-            log.warning("Frame ilegível no GIF, pulando", path=path, error=str(exc))
-            continue
-        if img.width > max_width:
-            ratio = max_width / img.width
-            img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
-        pil_frames.append(img.convert("P", palette=Image.ADAPTIVE, colors=256))
-
-    if not pil_frames:
-        raise ValueError(f"Nenhum frame válido para criar GIF em: {frames_folder}")
-
-    os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
-    pil_frames[0].save(
-        output_gif,
-        save_all=True,
-        append_images=pil_frames[1:],
-        optimize=False,
-        duration=duration_ms,
-        loop=0,
-    )
-
-    log.info(
-        "GIF gerado (Pillow)",
-        path=output_gif,
-        frames=len(pil_frames),
-        duration_ms=duration_ms,
-        speed=f"{speed_multiplier}x",
-    )
-    return output_gif
-
-
 def create_gif(
     video_path: str,
     output_gif: Optional[str] = None,
     speed_multiplier: int = 4,
-    max_width: int = 1920,
+    gif_width: int = 960,
 ) -> str:
     """
-    Converte um vídeo MP4 em GIF animado usando Pillow (via frames OpenCV).
+    Converte MP4 em GIF via ffmpeg com palette adaptativa (2-pass em filtergraph).
 
-    Substitui a implementação anterior baseada em MoviePy que causava
-    crash no Fortran runtime (forrtl error 200) em Windows.
+    Técnica:
+      - `palettegen` constrói a paleta ótima de 256 cores por diff de cena
+      - `paletteuse` aplica dithering Bayer para suavizar a quantização
+      - `fps` é elevado pelo speed_multiplier para acelerar sem interpolação
+      - `scale` usa Lanczos para redimensionar com máxima nitidez
 
     Args:
-        video_path:         Caminho do .mp4 de entrada.
-        output_gif:         Caminho do .gif de saída (None = mesmo nome do vídeo).
-        speed_multiplier:   Fator de aceleração (ex.: 4 = 4× mais rápido).
-        max_width:          Largura máxima para redimensionar os frames.
+        video_path:       Caminho do .mp4 de entrada.
+        output_gif:       Caminho do .gif de saída (None = mesmo nome do vídeo).
+        speed_multiplier: Fator de aceleração (ex.: 4 = 4× mais rápido).
+        gif_width:        Largura de saída px (-2 = altura automática proporcional).
 
     Returns:
         Caminho absoluto do GIF gerado.
     """
-    from PIL import Image  # type: ignore
+    import shutil
+    import subprocess
 
     if output_gif is None:
         output_gif = os.path.splitext(video_path)[0] + ".gif"
 
     os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
 
+    ff = shutil.which("ffmpeg")
+    if not ff:
+        raise FileNotFoundError(
+            "ffmpeg não encontrado no PATH — necessário para gerar GIF."
+        )
+
+    # FPS de saída do GIF: aceleração via frequência maior de frames
     cap = cv.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise FileNotFoundError(f"Não foi possível abrir o vídeo: {video_path}")
-
-    fps = cap.get(cv.CAP_PROP_FPS) or 10.0
-    duration_ms = max(20, int(1000 / (fps * speed_multiplier)))
-
-    pil_frames: list = []
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
-        # BGR → RGB
-        rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-        img = Image.fromarray(rgb)
-        if img.width > max_width:
-            ratio = max_width / img.width
-            img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
-        pil_frames.append(img.convert("P", palette=Image.ADAPTIVE, colors=256))
+    src_fps = cap.get(cv.CAP_PROP_FPS) or 10.0
+    total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
     cap.release()
+    gif_fps = max(10, int(src_fps * speed_multiplier))  # mínimo 10 fps
 
-    if not pil_frames:
-        raise ValueError(f"Nenhum frame extraído do vídeo: {video_path}")
+    # filtergraph: escala Lanczos → split → palettegen (diff) + paletteuse (Bayer)
+    scale_filter = f"scale={gif_width}:-2:flags=lanczos"
+    vf = (
+        f"fps={gif_fps},{scale_filter},"
+        f"split[s0][s1];"
+        f"[s0]palettegen=stats_mode=diff[p];"
+        f"[s1][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle"
+    )
 
-    pil_frames[0].save(
+    cmd = [
+        ff, "-y",
+        "-i", video_path,
+        "-vf", vf,
+        "-loop", "0",
         output_gif,
-        save_all=True,
-        append_images=pil_frames[1:],
-        optimize=False,
-        duration=duration_ms,
-        loop=0,
-    )
+    ]
 
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg GIF falhou:\n{result.stderr[-800:]}")
+
+    size_mb = os.path.getsize(output_gif) / 1024 / 1024
     log.info(
-        "GIF gerado (Pillow/vídeo)",
+        "GIF gerado (ffmpeg/palette)",
         path=output_gif,
-        frames=len(pil_frames),
-        duration_ms=duration_ms,
+        frames=total_frames,
+        gif_fps=gif_fps,
+        width=gif_width,
         speed=f"{speed_multiplier}x",
+        size_mb=f"{size_mb:.1f} MB",
     )
+    return output_gif
+
+
+def create_gif_from_frames(
+    frames_folder: str,
+    output_gif: str,
+    fps: int = 10,
+    speed_multiplier: int = 4,
+    gif_width: int = 960,
+    width: int = 1920,
+    height: int = 1080,
+) -> str:
+    """
+    Cria GIF a partir de frames JPG: monta MP4 temporário → ffmpeg palette GIF.
+
+    Fluxo: frames/ → MP4 temp → ffmpeg palettegen/paletteuse → .gif
+    O MP4 temporário é removido automaticamente após a conversão.
+
+    Args:
+        frames_folder:    Pasta com frames .jpg ordenados numericamente.
+        output_gif:       Caminho do .gif de saída.
+        fps:              FPS do vídeo temporário.
+        speed_multiplier: Aceleração do GIF.
+        gif_width:        Largura de saída do GIF em pixels.
+        width:            Largura do vídeo temporário (deve bater com os frames).
+        height:           Altura do vídeo temporário.
+
+    Returns:
+        Caminho absoluto do GIF gerado.
+    """
+    tmp_mp4 = os.path.splitext(output_gif)[0] + "_tmp.mp4"
+    create_video(
+        frames_folder=frames_folder,
+        output_path=tmp_mp4,
+        width=width,
+        height=height,
+        fps=fps,
+    )
+    try:
+        create_gif(
+            video_path=tmp_mp4,
+            output_gif=output_gif,
+            speed_multiplier=speed_multiplier,
+            gif_width=gif_width,
+        )
+    finally:
+        try:
+            os.remove(tmp_mp4)
+        except OSError:
+            pass
     return output_gif
