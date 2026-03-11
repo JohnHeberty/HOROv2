@@ -109,7 +109,7 @@ class WindRosePlotter:
         speed: pd.Series,
         output_path: str,
         title: str = "Wind Rose",
-        figsize: Tuple[float, float] = (10, 10),
+        figsize: Tuple[float, float] = (14, 10),
         dpi: int = 150,
     ) -> None:
         """
@@ -170,6 +170,8 @@ class WindRosePlotter:
         # Desenha figura
         # ------------------------------------------------------------------
         fig = plt.figure(figsize=figsize, facecolor="white")
+        # Reserva margem esquerda (~27% da largura) para a legenda
+        fig.subplots_adjust(left=0.27, right=0.97, bottom=0.09, top=0.93)
         ax = fig.add_subplot(111, polar=True)
 
         # Orientação: Norte no topo, sentido horário
@@ -238,22 +240,22 @@ class WindRosePlotter:
         ax.set_facecolor("#e8e8e8")
         fig.patch.set_facecolor("white")
 
-        # Legenda (tamanho dobrado)
+        # Legenda posicionada na margem esquerda (fora da rosa dos ventos)
         ax.legend(
             handles=legend_patches,
-            loc="lower left",
-            bbox_to_anchor=(-0.20, -0.18),
-            fontsize=18,  # Dobrado de 9 para 18
+            loc="center right",
+            bbox_to_anchor=(-0.30, 0.45),
+            fontsize=18,
             framealpha=0.9,
             title="Velocidade do vento",
-            title_fontsize=20,  # Dobrado de 10 para 20
+            title_fontsize=20,
         )
 
-        # Informações de ventos calmos e total de observações (mais claro)
+        # Informações de ventos calmos — centralizado sob a rosa dos ventos
         calm_text = f"Ventos calmos: {calm_pct:.1f}%  |  Total: {total:,} observações".replace(",", ".")
         fig.text(
-            0.5, 0.02, calm_text,
-            ha="center", va="bottom", fontsize=18, color="gray",  # Dobrado de 9 para 18
+            0.62, 0.02, calm_text,
+            ha="center", va="bottom", fontsize=18, color="gray",
         )
 
         # Título
@@ -261,7 +263,6 @@ class WindRosePlotter:
 
         # Salva
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
-        plt.tight_layout()
         plt.savefig(output_path, dpi=dpi, bbox_inches="tight", facecolor="white")
         plt.close(fig)
 
