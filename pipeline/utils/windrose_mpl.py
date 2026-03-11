@@ -240,11 +240,12 @@ class WindRosePlotter:
         ax.set_facecolor("#e8e8e8")
         fig.patch.set_facecolor("white")
 
-        # Legenda posicionada na margem esquerda (fora da rosa dos ventos)
-        ax.legend(
+        # Legenda no canto superior esquerdo da figura (coordenadas da figura)
+        fig.legend(
             handles=legend_patches,
-            loc="center right",
-            bbox_to_anchor=(-0.02, 0.45),
+            loc="upper left",
+            bbox_to_anchor=(0.01, 0.97),
+            bbox_transform=fig.transFigure,
             fontsize=18,
             framealpha=0.9,
             title="Velocidade do vento",
