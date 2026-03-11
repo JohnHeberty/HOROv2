@@ -312,20 +312,34 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
         log.info("Consultando NOAA via browser", stations=len(need_fetch))
         from pipeline.services.browser import CBrowser
 
-        with CBrowser() as driver:
-            for station, record in need_fetch:
-                lat = record.metadata.latitude
-                lon = record.metadata.longitude
-                log.info("Consultando NOAA", station=station, lat=lat, lon=lon)
-                try:
-                    dec = _fetch_declination(lat, lon, driver, timeout=config.browser.timeout_load)
-                    cache[station] = dec
-                    updated = True
-                    log.info("Declinação obtida", station=station, declination=dec)
-                except MagneticDeclinationError as exc:
-                    log.error("Falha ao obter declinação", station=station, error=str(exc))
-                    cache[station] = 0.0  # fallback neutro
-                    updated = True
+        try:
+            with CBrowser() as driver:
+                for station, record in need_fetch:
+                    lat = record.metadata.latitude
+                    lon = record.metadata.longitude
+                    log.info("Consultando NOAA", station=station, lat=lat, lon=lon)
+                    try:
+                        dec = _fetch_declination(lat, lon, driver, timeout=config.browser.timeout_load)
+                        cache[station] = dec
+                        updated = True
+                        log.info("Declinação obtida", station=station, declination=dec)
+                    except MagneticDeclinationError as exc:
+                        log.error("Falha ao obter declinação", station=station, error=str(exc))
+                        cache[station] = 0.0  # fallback neutro
+                        updated = True
+        except Exception as browser_exc:
+            # Chrome/ChromeDriver falhou ao iniciar (ex: ambiente sem display, Colab com paths
+            # incorretos, versão incompatível).  Registra o erro, aplica fallback 0.0 e
+            # CONTINUA o pipeline — o vídeo/GIF ainda será gerado sem correção magnética.
+            log.error(
+                "Falha ao iniciar o browser — declinação será 0.0 para todas as estações. "
+                "No Colab, verifique se a Seção 0 instalou o chromium-chromedriver corretamente.",
+                error=str(browser_exc),
+            )
+            for station, _ in need_fetch:
+                if station not in cache:
+                    cache[station] = 0.0
+            updated = True
 
     if updated:
         _save_cache(cache_path, cache)
