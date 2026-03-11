@@ -109,7 +109,7 @@ class WindRosePlotter:
         speed: pd.Series,
         output_path: str,
         title: str = "Wind Rose",
-        figsize: Tuple[float, float] = (11, 10),
+        figsize: Tuple[float, float] = (12, 10),
         dpi: int = 150,
     ) -> None:
         """
@@ -170,8 +170,8 @@ class WindRosePlotter:
         # Desenha figura
         # ------------------------------------------------------------------
         fig = plt.figure(figsize=figsize, facecolor="white")
-        # Margem esquerda apenas o suficiente para a caixa da legenda
-        fig.subplots_adjust(left=0.24, right=0.97, bottom=0.09, top=0.93)
+        # Margem esquerda suficiente para a legenda no canto sup. esq. sem sobrepor a rosa
+        fig.subplots_adjust(left=0.28, right=0.97, bottom=0.09, top=0.93)
         ax = fig.add_subplot(111, polar=True)
 
         # Orientação: Norte no topo, sentido horário
@@ -255,7 +255,7 @@ class WindRosePlotter:
         # Informações de ventos calmos — centralizado sob a rosa dos ventos
         calm_text = f"Ventos calmos: {calm_pct:.1f}%  |  Total: {total:,} observações".replace(",", ".")
         fig.text(
-            0.62, 0.02, calm_text,
+            0.625, 0.02, calm_text,
             ha="center", va="bottom", fontsize=18, color="gray",
         )
 
