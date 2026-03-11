@@ -23,16 +23,19 @@ from pipeline.core.logger import get_logger
 
 log = get_logger("services.browser")
 
-# Caminhos conhecidos do Chromium no Ubuntu/Debian (Colab, CI, etc.)
+# Caminhos conhecidos do Chrome/Chromium no Linux (Colab, CI, etc.)
+# Prioridade: Google Chrome stable > Chromium (snap-based não funciona em Colab)
 _COLAB_CHROMEDRIVER_PATHS = [
-    "/usr/lib/chromium-browser/chromedriver",
+    "/usr/local/bin/chromedriver",           # symlink criado pelo webdriver-manager
     "/usr/bin/chromedriver",
-    "/usr/local/bin/chromedriver",
+    "/usr/lib/chromium-browser/chromedriver", # Chromium via debian
+    "/usr/lib/chromium/chromedriver",        # Chromium alternativo
 ]
 _COLAB_CHROME_BINARY_PATHS = [
-    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",               # Google Chrome stable (preferido no Colab)
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium-browser",            # Chromium (fallback)
     "/usr/bin/chromium",
-    "/snap/bin/chromium",
 ]
 
 
@@ -86,8 +89,10 @@ class CBrowser:
     def open(self):
         """
         Abre o Chrome headless.
-        Detecta automaticamente se usa o Chromium do sistema
-        (Colab / Linux) ou webdriver-manager (Windows / Mac).
+        Lógica de detecção:
+          1. Procura o binário do Chrome/Chromium no sistema (Linux/Colab).
+          2. Procura o ChromeDriver no sistema ou no cache do webdriver-manager.
+          3. Se o ChromeDriver não for encontrado localmente, baixa via webdriver-manager.
         """
         from selenium import webdriver
         from selenium.webdriver.chrome.service import Service
@@ -103,21 +108,20 @@ class CBrowser:
         if self.headless:
             options.add_argument("--headless=new")
 
-        # ── Detecção: Colab / Linux com Chromium de sistema ────────────────
+        # ── Localiza o binário do Chrome/Chromium ─────────────────────────────
         chrome_binary, chromedriver_path = _find_system_chromium()
 
-        if chrome_binary and chromedriver_path:
-            log.info(
-                "Chromium de sistema detectado",
-                binary=chrome_binary,
-                driver=chromedriver_path,
-            )
+        if chrome_binary:
             options.binary_location = chrome_binary
-            service = Service(executable_path=chromedriver_path)
+            log.info("Binário Chrome detectado", binary=chrome_binary)
 
+        # ── Localiza o ChromeDriver ────────────────────────────────────────────
+        if chromedriver_path:
+            log.info("ChromeDriver de sistema detectado", driver=chromedriver_path)
+            service = Service(executable_path=chromedriver_path)
         else:
-            # ── Fallback: webdriver-manager (Windows / Mac) ────────────────
-            log.info("Usando webdriver-manager para baixar ChromeDriver", os=self.system)
+            # Sem driver no sistema → baixa via webdriver-manager (usa cache se já baixou)
+            log.info("ChromeDriver não encontrado no sistema — usando webdriver-manager", os=self.system)
             from webdriver_manager.chrome import ChromeDriverManager
             service = Service(executable_path=ChromeDriverManager().install())
 
