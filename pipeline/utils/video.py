@@ -85,7 +85,7 @@ def create_gif(
     video_path: str,
     output_gif: Optional[str] = None,
     speed_multiplier: int = 4,
-    gif_width: int = 1920,
+    gif_width: int = 1280,
 ) -> str:
     """
     Converte MP4 em GIF via ffmpeg com palette adaptativa (2-pass em filtergraph).
@@ -165,7 +165,7 @@ def create_gif_from_frames(
     output_gif: str,
     fps: int = 10,
     speed_multiplier: int = 4,
-    gif_width: int = 1920,
+    gif_width: int = 1280,
     width: int = 1920,
     height: int = 1080,
 ) -> str:
