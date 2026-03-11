@@ -91,9 +91,10 @@ def create_gif(
     Converte MP4 em GIF via ffmpeg com palette adaptativa (2-pass em filtergraph).
 
     Técnica:
+      - `setpts=PTS/N` comprime os timestamps para acelerar N× sem duplicar frames
+      - `fps` reamostra para o fps da fonte (≤50) após a compressão de tempo
       - `palettegen` constrói a paleta ótima de 256 cores por diff de cena
       - `paletteuse` aplica dithering Bayer para suavizar a quantização
-      - `fps` é elevado pelo speed_multiplier para acelerar sem interpolação
       - `scale` usa Lanczos para redimensionar com máxima nitidez
 
     Args:
@@ -119,16 +120,21 @@ def create_gif(
             "ffmpeg não encontrado no PATH — necessário para gerar GIF."
         )
 
-    # FPS de saída do GIF: aceleração via frequência maior de frames
+    # Lê FPS e contagem de frames da fonte
     cap = cv.VideoCapture(video_path)
     src_fps = cap.get(cv.CAP_PROP_FPS) or 10.0
     total_frames = int(cap.get(cv.CAP_PROP_FRAME_COUNT))
     cap.release()
-    gif_fps = max(10, int(src_fps * speed_multiplier))  # mínimo 10 fps
 
-    # filtergraph: escala Lanczos → split → palettegen (diff) + paletteuse (Bayer)
+    # Aceleração via compressão de timestamps (setpts), não inflando fps.
+    # gif_fps = fps de saída capped a 50 (limite prático do GIF); setpts comprime
+    # o tempo para que todos os frames sejam amostrados proporcionalmente.
+    gif_fps = min(50, max(10, int(src_fps)))
+
+    # filtergraph: setpts acelera → fps reamostras → Lanczos → palettegen/paletteuse
     scale_filter = f"scale={gif_width}:-2:flags=lanczos"
     vf = (
+        f"setpts=PTS/{speed_multiplier},"
         f"fps={gif_fps},{scale_filter},"
         f"split[s0][s1];"
         f"[s0]palettegen=stats_mode=diff[p];"
