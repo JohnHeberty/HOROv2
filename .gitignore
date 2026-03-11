@@ -169,3 +169,8 @@ data/.cache/
 # Manter apenas a pasta raw (sem os arquivos CSV pessoais)
 !data/raw/
 !data/raw/.gitkeep
+
+# --- Logs de auditoria (HOROv2) ---
+# logs/ fica na raiz do projeto; NÃO vai para o Git (pode conter paths sensíveis)
+logs/
+pipeline_run.log

@@ -1,7 +1,7 @@
 """
 orchestrator.py
 ===============
-Ponto de entrada CLI do pipeline HOROv1.
+Ponto de entrada CLI do pipeline HOROv2.
 
 Uso:
     python orchestrator.py --all
@@ -9,6 +9,10 @@ Uso:
     python orchestrator.py --all --force
     python orchestrator.py --all --station BRASILIA
     python orchestrator.py --all --dry-run
+
+Logs gravados em:
+    logs/pipeline_run.log          — último run (sobrescreve)
+    logs/archive/pipeline_<ts>.log — auditoria por timestamp
 
 Desenvolvido por John Heberty de Freitas — john.7heberty@gmail.com
 """
@@ -208,6 +212,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     configure_logging(level=args.log_level)
+
+    from pipeline.core.logger import LOG_LATEST
+    log.info(f"HOROv2 — pipeline iniciado  |  log → {LOG_LATEST}")
 
     stages = STAGE_NAMES if args.all else [args.stage]
 
