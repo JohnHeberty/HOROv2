@@ -122,8 +122,8 @@ class RenderConfig:
     font: int = cv.FONT_HERSHEY_SIMPLEX
     font_size: float = 1.05  # Aumentado levemente
     font_thickness: int = 2   # Negrito
-    gif_speed_multiplier: int = 10   # dobrado de 5
-    fps_video: int = 26              # dobrado de 13
+    gif_speed_multiplier: int = 10   # multiplica fps do video para acelerar GIF
+    fps_video: int = 30              # 210 frames / 30fps = 7s de video
     wind_rose_proportion: float = 0.2242  # Raio da rosa (mais 5% de redução: 0.236 → 0.2242)
     background_gray: tuple = (40, 40, 40)  # Fundo cinza escuro da imagem (BGR)
     windrose_background: tuple = (90, 90, 90)  # Fundo cinza claro da rosa dos ventos (BGR)
