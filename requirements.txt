@@ -4,6 +4,8 @@ matplotlib
 scikit-learn
 opencv-python
 moviepy
+selenium
+webdriver-manager
 geomag
 Unidecode
 chardet

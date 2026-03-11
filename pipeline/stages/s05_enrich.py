@@ -4,8 +4,9 @@ pipeline/stages/s05_enrich.py
 Stage 5 — ENRICH: Silver → Silver (Declinação magnética)
 
 Responsabilidades:
-  - Calcula a declinação magnética localmente via modelo WMM (pacote geomag)
-  - Usa cache local (data/silver/declinations.json) para evitar recálculos
+  - Local  → consulta o site NOAA via Selenium/Chrome (alta precisão)
+  - Colab  → calcula localmente via modelo WMM (pacote geomag, sem browser)
+  - Usa cache local (data/silver/declinations.json) para evitar repetições
   - Aplica declinação magnética ao SilverRecord
 
 Entrada:  context.silver
@@ -17,15 +18,27 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from datetime import datetime
 from typing import Dict, Optional
 
 from pipeline.core.config import PipelineConfig, cfg
+from pipeline.core.exceptions import MagneticDeclinationError
 from pipeline.core.logger import get_logger
 from pipeline.core.models import PipelineContext
 
 log = get_logger("s05_enrich")
 
 DECLINATIONS_CACHE_FILE = "declinations.json"
+
+
+def _in_colab() -> bool:
+    """Retorna True se o código estiver rodando no Google Colab."""
+    try:
+        import google.colab  # noqa: F401
+        return True
+    except ImportError:
+        return False
 
 
 def _load_cache(cache_path: str) -> Dict[str, float]:
@@ -40,17 +53,116 @@ def _save_cache(cache_path: str, data: Dict[str, float]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _fetch_declination(lat: float, lon: float) -> float:
+# ---------------------------------------------------------------------------
+# Estratégia A — NOAA via Selenium (local: Windows/Mac/Linux com Chrome)
+# ---------------------------------------------------------------------------
+
+def _fetch_declination_noaa(lat: float, lon: float, driver, timeout: int = 60) -> float:
+    """
+    Consulta o site NOAA via Selenium para obter a declinação magnética.
+    Alta precisão — usa o modelo WMM2025 do servidor NOAA.
+    """
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support import expected_conditions as EC
+    from selenium.webdriver.support.ui import WebDriverWait
+
+    from pipeline.utils.geo import dms_string_to_decimal
+
+    Declination = ""
+
+    def wait_click(css):
+        try:
+            el = WebDriverWait(driver, timeout).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, css))
+            )
+            el.click()
+            return el
+        except Exception:
+            return None
+
+    wait_click("#declinationIGRF")
+
+    el = wait_click("#declinationLat1")
+    if el:
+        el.clear()
+        el.send_keys(str(abs(lat)))
+        time.sleep(1)
+        lat_dir = 'S' if lat < 0 else 'N'
+        try:
+            driver.find_element(By.CSS_SELECTOR, f"[value='{lat_dir}']").click()
+        except Exception:
+            pass
+
+    el = wait_click("#declinationLon1")
+    if el:
+        el.clear()
+        el.send_keys(str(abs(lon)))
+        time.sleep(1)
+        lon_dir = 'W' if lon < 0 else 'E'
+        try:
+            driver.find_element(By.CSS_SELECTOR, f"[value='{lon_dir}']").click()
+        except Exception:
+            pass
+
+    wait_click("#declinationHTML")
+    wait_click("#calcbutton")
+    time.sleep(8)
+
+    try:
+        data_find = datetime.now().strftime("%Y-%m-%d")
+        el = WebDriverWait(driver, timeout * 2).until(
+            EC.element_to_be_clickable((By.XPATH, f"//*[contains(text(), '{data_find}')]"))
+        )
+        parent = el.find_element(By.XPATH, "./..")
+        children = parent.find_elements(By.XPATH, ".//*")
+        Declination = children[1].text.split("changing")[0].strip().upper()
+        log.debug("Resultado NOAA encontrado", declination_raw=Declination)
+    except Exception as exc:
+        try:
+            html_path = "data/silver/noaa_page_source.html"
+            with open(html_path, "w", encoding="utf-8") as f:
+                f.write(driver.page_source)
+            log.error("Erro ao extrair resultado NOAA — HTML salvo", error=str(exc)[:500], html_path=html_path)
+        except Exception:
+            log.error("Erro ao extrair resultado NOAA", error=str(exc)[:500])
+
+    driver.delete_all_cookies()
+    driver.refresh()
+
+    if not Declination.strip():
+        raise MagneticDeclinationError(lat, lon)
+
+    direction = Declination[-1:].strip()
+    value_str = Declination[:-1].strip().replace('°', '').strip()
+
+    if '.' in value_str and "'" not in value_str and '"' not in value_str:
+        angle = float(value_str)
+    else:
+        angle = dms_string_to_decimal(value_str, direction)
+
+    if direction in ('W', 'S'):
+        angle = -abs(angle)
+    else:
+        angle = abs(angle)
+
+    time.sleep(5)
+    return angle
+
+
+# ---------------------------------------------------------------------------
+# Estratégia B — WMM local via geomag (Colab: sem browser, sem internet)
+# ---------------------------------------------------------------------------
+
+def _fetch_declination_wmm(lat: float, lon: float) -> float:
     """
     Calcula a declinação magnética localmente via modelo WMM (pacote geomag).
-
-    Sem internet, sem API key. Retorna graus decimais:
-      positivo = Leste, negativo = Oeste.
+    Usado no Colab onde Chrome não está disponível.
+    Retorna graus decimais: positivo = Leste, negativo = Oeste.
     """
     import geomag
 
     declination = geomag.declination(lat, lon)
-    log.debug("Declinação calculada localmente (WMM)", lat=lat, lon=lon, declination=declination)
+    log.debug("Declinação calculada (WMM local)", lat=lat, lon=lon, declination=declination)
     return float(declination)
 
 
@@ -123,24 +235,63 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
     if not need_fetch:
         log.info("Todas as declinações já estão em cache")
     else:
-        log.info("Calculando declinação magnética (WMM local)", stations=len(need_fetch))
-        for station, record in need_fetch:
-            lat = record.metadata.latitude
-            lon = record.metadata.longitude
-            log.info("Calculando (WMM)", station=station, lat=lat, lon=lon)
+        colab = _in_colab()
+        if colab:
+            # ── Colab: calcula localmente (sem Chrome) ─────────────────────────
+            log.info("Colab detectado — calculando declinação via WMM local", stations=len(need_fetch))
+            for station, record in need_fetch:
+                lat = record.metadata.latitude
+                lon = record.metadata.longitude
+                log.info("Calculando (WMM)", station=station, lat=lat, lon=lon)
+                try:
+                    dec = _fetch_declination_wmm(lat, lon)
+                    cache[station] = dec
+                    updated = True
+                    log.info("Declinação calculada (WMM)", station=station, declination=dec)
+                except Exception as exc:
+                    log.warning(
+                        "WMM falhou — usando 0.0 (fallback neutro)",
+                        station=station, error=str(exc),
+                    )
+                    cache[station] = 0.0
+                    updated = True
+        else:
+            # ── Local: consulta NOAA via Selenium (alta precisão) ──────────────
+            log.info("Ambiente local — consultando NOAA via browser", stations=len(need_fetch))
+            from pipeline.services.browser import CBrowser
             try:
-                dec = _fetch_declination(lat, lon)
-                cache[station] = dec
-                updated = True
-                log.info("Declinação calculada", station=station, declination=dec)
-            except Exception as exc:
-                log.warning(
-                    "Cálculo de declinação falhou — usando 0.0 (fallback neutro)",
-                    station=station,
-                    error=str(exc),
+                with CBrowser() as driver:
+                    for station, record in need_fetch:
+                        lat = record.metadata.latitude
+                        lon = record.metadata.longitude
+                        log.info("Consultando NOAA", station=station, lat=lat, lon=lon)
+                        try:
+                            dec = _fetch_declination_noaa(lat, lon, driver, timeout=config.browser.timeout_load)
+                            cache[station] = dec
+                            updated = True
+                            log.info("Declinação NOAA obtida", station=station, declination=dec)
+                        except MagneticDeclinationError as exc:
+                            log.error("Falha ao obter declinação NOAA", station=station, error=str(exc))
+                            cache[station] = 0.0
+                            updated = True
+            except Exception as browser_exc:
+                log.error(
+                    "Falha ao iniciar o browser — usando WMM local como fallback",
+                    error=str(browser_exc),
                 )
-                cache[station] = 0.0
-                updated = True
+                for station, record in need_fetch:
+                    if station not in cache:
+                        lat = record.metadata.latitude
+                        lon = record.metadata.longitude
+                        try:
+                            cache[station] = _fetch_declination_wmm(lat, lon)
+                            log.warning(
+                                "Fallback WMM aplicado (browser falhou)",
+                                station=station, declination=cache[station],
+                            )
+                        except Exception:
+                            cache[station] = 0.0
+                        updated = True
 
     if updated:
         _save_cache(cache_path, cache)
