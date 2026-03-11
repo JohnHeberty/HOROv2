@@ -81,43 +81,140 @@ def create_video(
     return output_path
 
 
-def create_gif(
-    video_path: str,
-    output_gif: Optional[str] = None,
+def create_gif_from_frames(
+    frames_folder: str,
+    output_gif: str,
+    fps: int = 10,
     speed_multiplier: int = 4,
+    max_width: int = 640,
 ) -> str:
     """
-    Converte um vídeo MP4 em GIF animado usando moviepy.
+    Cria GIF animado diretamente de frames JPG usando Pillow.
 
-    Compatível com moviepy 1.x e 2.x.
+    Evita MoviePy e seus problemas de crash no Fortran runtime (forrtl error 200).
 
     Args:
-        video_path:         Caminho do .mp4 de entrada.
-        output_gif:         Caminho do .gif de saída. Se None, usa mesmo nome do vídeo.
-        speed_multiplier:   Fator de aceleração (ex.: 4 = 4× mais rápido).
+        frames_folder:      Pasta com frames .jpg (ordenados numericamente).
+        output_gif:         Caminho de saída do .gif.
+        fps:                Frames por segundo do vídeo original.
+        speed_multiplier:   Aceleração do GIF (ex.: 4 = 4× mais rápido).
+        max_width:          Largura máxima para redimensionar os frames.
 
     Returns:
         Caminho absoluto do GIF gerado.
     """
+    from PIL import Image  # type: ignore
+
+    jpg_files = sorted(
+        glob(os.path.join(frames_folder, "*.jpg")),
+        key=lambda x: int("".join(c for c in os.path.basename(x) if c.isdigit()) or "0"),
+    )
+    if not jpg_files:
+        raise FileNotFoundError(f"Nenhum frame .jpg encontrado em: {frames_folder}")
+
+    duration_ms = max(20, int(1000 / (fps * speed_multiplier)))
+
+    pil_frames: list = []
+    for path in jpg_files:
+        try:
+            img = Image.open(path).convert("RGB")
+        except Exception as exc:
+            log.warning("Frame ilegível no GIF, pulando", path=path, error=str(exc))
+            continue
+        if img.width > max_width:
+            ratio = max_width / img.width
+            img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+        pil_frames.append(img.convert("P", palette=Image.ADAPTIVE, colors=256))
+
+    if not pil_frames:
+        raise ValueError(f"Nenhum frame válido para criar GIF em: {frames_folder}")
+
+    os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
+    pil_frames[0].save(
+        output_gif,
+        save_all=True,
+        append_images=pil_frames[1:],
+        optimize=False,
+        duration=duration_ms,
+        loop=0,
+    )
+
+    log.info(
+        "GIF gerado (Pillow)",
+        path=output_gif,
+        frames=len(pil_frames),
+        duration_ms=duration_ms,
+        speed=f"{speed_multiplier}x",
+    )
+    return output_gif
+
+
+def create_gif(
+    video_path: str,
+    output_gif: Optional[str] = None,
+    speed_multiplier: int = 4,
+    max_width: int = 640,
+) -> str:
+    """
+    Converte um vídeo MP4 em GIF animado usando Pillow (via frames OpenCV).
+
+    Substitui a implementação anterior baseada em MoviePy que causava
+    crash no Fortran runtime (forrtl error 200) em Windows.
+
+    Args:
+        video_path:         Caminho do .mp4 de entrada.
+        output_gif:         Caminho do .gif de saída (None = mesmo nome do vídeo).
+        speed_multiplier:   Fator de aceleração (ex.: 4 = 4× mais rápido).
+        max_width:          Largura máxima para redimensionar os frames.
+
+    Returns:
+        Caminho absoluto do GIF gerado.
+    """
+    from PIL import Image  # type: ignore
+
     if output_gif is None:
         output_gif = os.path.splitext(video_path)[0] + ".gif"
 
     os.makedirs(os.path.dirname(os.path.abspath(output_gif)), exist_ok=True)
 
-    try:
-        # moviepy >= 2.0
-        from moviepy import VideoFileClip  # type: ignore
-    except ImportError:
-        # moviepy 1.x
-        from moviepy.editor import VideoFileClip  # type: ignore
+    cap = cv.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Não foi possível abrir o vídeo: {video_path}")
 
-    clip = VideoFileClip(video_path)
+    fps = cap.get(cv.CAP_PROP_FPS) or 10.0
+    duration_ms = max(20, int(1000 / (fps * speed_multiplier)))
 
-    if speed_multiplier != 1:
-        clip = clip.with_speed_scaled(speed_multiplier) if hasattr(clip, "with_speed_scaled") else clip.speedx(speed_multiplier)
+    pil_frames: list = []
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        # BGR → RGB
+        rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+        img = Image.fromarray(rgb)
+        if img.width > max_width:
+            ratio = max_width / img.width
+            img = img.resize((max_width, int(img.height * ratio)), Image.LANCZOS)
+        pil_frames.append(img.convert("P", palette=Image.ADAPTIVE, colors=256))
+    cap.release()
 
-    clip.write_gif(output_gif, fps=clip.fps)
-    clip.close()
+    if not pil_frames:
+        raise ValueError(f"Nenhum frame extraído do vídeo: {video_path}")
 
-    log.info("GIF gerado", path=output_gif, speed=f"{speed_multiplier}x")
+    pil_frames[0].save(
+        output_gif,
+        save_all=True,
+        append_images=pil_frames[1:],
+        optimize=False,
+        duration=duration_ms,
+        loop=0,
+    )
+
+    log.info(
+        "GIF gerado (Pillow/vídeo)",
+        path=output_gif,
+        frames=len(pil_frames),
+        duration_ms=duration_ms,
+        speed=f"{speed_multiplier}x",
+    )
     return output_gif

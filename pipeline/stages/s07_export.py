@@ -24,7 +24,7 @@ from pipeline.core.config import PipelineConfig, cfg
 from pipeline.core.exceptions import ExportError
 from pipeline.core.logger import get_logger
 from pipeline.core.models import PipelineContext
-from pipeline.utils.video import create_gif, create_video
+from pipeline.utils.video import create_gif, create_gif_from_frames, create_video
 from pipeline.utils.windrose_mpl import WindRosePlotter
 
 log = get_logger("s07_export")
@@ -111,25 +111,13 @@ def run(context: PipelineContext, config: PipelineConfig = cfg) -> PipelineConte
                     _min_gif_frames = config.render.gif_spin_deg  # e.g. 360
 
                     if os.path.isdir(gif_frames_folder) and _gif_jpg_count >= _min_gif_frames:
-                        # Constrói vídeo temporário a partir dos frames 360° e converte para GIF
-                        _gif_tmp_video = os.path.splitext(video_path)[0] + "_gif_tmp.mp4"
-                        create_video(
+                        # Cria GIF diretamente dos frames JPG com Pillow (sem MoviePy)
+                        create_gif_from_frames(
                             frames_folder=gif_frames_folder,
-                            output_path=_gif_tmp_video,
-                            width=rc.image_width,
-                            height=rc.image_height,
-                            fps=rc.fps_video,
-                        )
-                        create_gif(
-                            video_path=_gif_tmp_video,
                             output_gif=gif_path,
+                            fps=rc.fps_video,
                             speed_multiplier=rc.gif_speed_multiplier,
                         )
-                        # Remove vídeo temporário
-                        try:
-                            os.remove(_gif_tmp_video)
-                        except OSError:
-                            pass
                         log.info("GIF 360° gerado", station=station, years=years,
                                  frames=_gif_jpg_count, path=gif_path)
                     else:
