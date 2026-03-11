@@ -442,7 +442,7 @@ def _render_frame(
     # ---- Salva frame (contorno para caminhos não-ASCII no Windows) ----
     os.makedirs(frames_folder, exist_ok=True)
     jpg_path = os.path.join(frames_folder, f"{frame_idx:04d}.jpg")
-    ok, encoded = cv.imencode(".jpg", img, [cv.IMWRITE_JPEG_QUALITY, 90])
+    ok, encoded = cv.imencode(".jpg", img, [cv.IMWRITE_JPEG_QUALITY, 95])
     if ok:
         with open(jpg_path, "wb") as fh:
             fh.write(encoded.tobytes())

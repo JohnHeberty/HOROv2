@@ -86,7 +86,7 @@ def create_gif_from_frames(
     output_gif: str,
     fps: int = 10,
     speed_multiplier: int = 4,
-    max_width: int = 640,
+    max_width: int = 1920,
 ) -> str:
     """
     Cria GIF animado diretamente de frames JPG usando Pillow.
@@ -153,7 +153,7 @@ def create_gif(
     video_path: str,
     output_gif: Optional[str] = None,
     speed_multiplier: int = 4,
-    max_width: int = 640,
+    max_width: int = 1920,
 ) -> str:
     """
     Converte um vídeo MP4 em GIF animado usando Pillow (via frames OpenCV).
