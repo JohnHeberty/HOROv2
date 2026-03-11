@@ -277,6 +277,12 @@ class PipelineConfig:
             _gspin = video.get("gif_spin_deg")
             if isinstance(_gspin, int) and _gspin > 0:
                 self.render.gif_spin_deg = _gspin
+            _fps = video.get("fps_video")
+            if isinstance(_fps, int) and _fps > 0:
+                self.render.fps_video = _fps
+            _gmult = video.get("gif_speed_multiplier")
+            if isinstance(_gmult, int) and _gmult > 0:
+                self.render.gif_speed_multiplier = _gmult
             _cores_video = video.get("cores_rgb")
             if isinstance(_cores_video, list) and len(_cores_video) >= 6:
                 self.render.video_band_colors_bgr = [

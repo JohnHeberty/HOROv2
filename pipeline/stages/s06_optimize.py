@@ -417,23 +417,24 @@ def _render_frame(
     # ---- Rosa dos ventos NOAA (lado DIREITO, alinhada) ----
     if windrose_img is not None:
         try:
-            # Redimensiona windrose (20% menor que antes)
+            # Redimensiona windrose (+20% em relação a 360px base)
             wr_height, wr_width = windrose_img.shape[:2]
-            target_width = 360  # Reduzido de 450 para 360 (20% menor)
+            target_width = 432  # 360 * 1.20 = 432 (+20%)
             scale = target_width / wr_width
             target_height = int(wr_height * scale)
-            
-            windrose_resized = cv.resize(windrose_img, (target_width, target_height), 
+
+            windrose_resized = cv.resize(windrose_img, (target_width, target_height),
                                         interpolation=cv.INTER_LANCZOS4)
-            
-            # Posiciona na mesma altura da legenda (lado direito)
-            wr_y_start = legend_y_start
-            wr_x_start = rx  # Alinhado com as informações de cima
-            
+
+            # Alinha à direita com margem de 10px (desloca ~20% para direita vs posição anterior)
+            wr_x_start = rc.image_width - target_width - 10
+            # Y: mesma altura da legenda; clampado para não sair da imagem pela base
+            wr_y_start = min(legend_y_start, rc.image_height - target_height - 10)
+
             # Certifica que não ultrapassa os limites
-            if wr_y_start + target_height < rc.image_height:
+            if wr_y_start >= 0 and wr_x_start >= 0:
                 # Insere a windrose na imagem
-                img[wr_y_start:wr_y_start + target_height, 
+                img[wr_y_start:wr_y_start + target_height,
                     wr_x_start:wr_x_start + target_width] = windrose_resized
         except Exception as e:
             # Se falhar, apenas loga mas não quebra o frame

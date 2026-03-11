@@ -8,7 +8,6 @@
     },
     "runway_length_m": 1199
   },
-
   "rosa_dos_ventos": {
     "_note_bands": "Limites das bandas de velocidade em nos. Gera faixas: [0-3] [3-13] [13-20] [20-25] [25-40] [40+].",
     "wind_speed_bands_kts": [3, 13, 20, 25, 40],
@@ -22,11 +21,13 @@
       [255,  30,   0]
     ]
   },
-
   "video": {
     "_note_spin": "Graus de rotacao da pista no video (MP4) e no GIF. O video usa video_spin_deg; o GIF usa gif_spin_deg.",
     "video_spin_deg": 180,
     "gif_spin_deg": 360,
+    "_note_fps": "fps_video: quadros por segundo do MP4 (frames / fps = duracao em segundos). gif_speed_multiplier: fator de aceleracao do GIF (setpts=PTS/N).",
+    "fps_video": 14,
+    "gif_speed_multiplier": 2,
     "_note_cores": "Formato [R, G, B] 0-255. Paleta do video — separada da rosa para permitir paletas distintas.",
     "cores_rgb": [
       [180, 180, 180],
@@ -37,15 +38,13 @@
       [255,  30,   0]
     ]
   },
-
   "localizacao": {
     "_note": "Opcional. Se informados, substituem as coordenadas lidas do cabecalho do CSV. Use null para desativar.",
     "latitude": -23.428375,
     "longitude": -46.467887
   },
-
   "declinacao_magnetica": {
     "_note": "Opcional. Se 'valor' for informado (graus; positivo=Leste, negativo=Oeste), a consulta a NOAA e ignorada. Use null para calcular automaticamente.",
-    "valor": -21.5
+    "valor": null
   }
 }
