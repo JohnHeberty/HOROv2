@@ -109,7 +109,7 @@ class WindRosePlotter:
         speed: pd.Series,
         output_path: str,
         title: str = "Wind Rose",
-        figsize: Tuple[float, float] = (12, 10),
+        figsize: Tuple[float, float] = (11, 10),
         dpi: int = 150,
     ) -> None:
         """
@@ -170,8 +170,8 @@ class WindRosePlotter:
         # Desenha figura
         # ------------------------------------------------------------------
         fig = plt.figure(figsize=figsize, facecolor="white")
-        # Reserva margem esquerda (~27% da largura) para a legenda
-        fig.subplots_adjust(left=0.18, right=0.97, bottom=0.09, top=0.93)
+        # Margem esquerda apenas o suficiente para a caixa da legenda
+        fig.subplots_adjust(left=0.24, right=0.97, bottom=0.09, top=0.93)
         ax = fig.add_subplot(111, polar=True)
 
         # Orientação: Norte no topo, sentido horário
@@ -244,7 +244,7 @@ class WindRosePlotter:
         ax.legend(
             handles=legend_patches,
             loc="center right",
-            bbox_to_anchor=(-0.30, 0.45),
+            bbox_to_anchor=(-0.02, 0.45),
             fontsize=18,
             framealpha=0.9,
             title="Velocidade do vento",
